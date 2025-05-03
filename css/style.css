@@ -1,0 +1,226 @@
+/* Main Styles for Plant Selling System */
+
+:root {
+    --primary-color: #198754;
+    --secondary-color: #6c757d;
+    --dark-green: #155724;
+    --light-green: #d4edda;
+    --bs-body-font-family: 'Poppins', sans-serif;
+}
+
+/* Global styles */
+body {
+    font-family: 'Poppins', sans-serif;
+    color: #333;
+    line-height: 1.6;
+}
+
+a {
+    text-decoration: none;
+    color: var(--primary-color);
+    transition: all 0.3s ease;
+}
+
+a:hover {
+    color: var(--dark-green);
+}
+
+.btn-success {
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-success:hover {
+    background-color: var(--dark-green);
+    border-color: var(--dark-green);
+}
+
+.btn-outline-success {
+    color: var(--primary-color);
+    border-color: var(--primary-color);
+}
+
+.btn-outline-success:hover {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+/* Hero Section */
+.hero-section {
+    padding: 100px 0;
+    background-color: #f8f9fa;
+    margin-bottom: 30px;
+}
+
+.hero-section h1 {
+    font-size: 3rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    color: var(--dark-green);
+}
+
+.hero-section .lead {
+    font-size: 1.25rem;
+    margin-bottom: 30px;
+}
+
+.hero-section .btn {
+    padding: 10px 25px;
+    font-weight: 500;
+}
+
+/* Card Styles */
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    margin-bottom: 20px;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card-title {
+    font-weight: 600;
+    color: var(--dark-green);
+}
+
+.product-card .card-img-top {
+    height: 200px;
+    object-fit: cover;
+}
+
+/* Benefits Section */
+.benefit-item {
+    padding: 20px;
+    border-radius: 5px;
+    transition: transform 0.3s ease;
+}
+
+.benefit-item:hover {
+    transform: translateY(-10px);
+}
+
+.benefit-item h4 {
+    margin: 15px 0;
+    font-weight: 600;
+    color: var(--dark-green);
+}
+
+/* Testimonials */
+.testimonials .card {
+    padding: 15px;
+}
+
+.testimonials .card-text {
+    font-style: italic;
+    margin-bottom: 15px;
+}
+
+/* Newsletter Section */
+.newsletter {
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--dark-green) 100%);
+}
+
+.newsletter h3 {
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.newsletter .btn {
+    font-weight: 500;
+}
+
+/* Footer */
+footer {
+    background-color: #343a40;
+    color: white;
+    padding: 50px 0 20px;
+}
+
+footer .footer-heading {
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: white;
+}
+
+footer ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+footer ul li {
+    margin-bottom: 10px;
+}
+
+footer ul li a {
+    color: #adb5bd;
+}
+
+footer ul li a:hover {
+    color: white;
+}
+
+.social-icons a {
+    display: inline-block;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white;
+    text-align: center;
+    line-height: 36px;
+    margin-right: 10px;
+    transition: all 0.3s ease;
+}
+
+.social-icons a:hover {
+    background-color: var(--primary-color);
+    transform: translateY(-3px);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .hero-section {
+        padding: 60px 0;
+        text-align: center;
+    }
+    
+    .hero-section h1 {
+        font-size: 2.5rem;
+    }
+    
+    .hero-section img {
+        margin-top: 30px;
+    }
+}
+
+/* Animation for benefits section */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.benefit-item {
+    animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.benefit-item:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.benefit-item:nth-child(2) {
+    animation-delay: 0.3s;
+}
+
+.benefit-item:nth-child(3) {
+    animation-delay: 0.5s;
+} 

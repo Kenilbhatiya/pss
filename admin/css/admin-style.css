@@ -1,0 +1,191 @@
+/* Admin Dashboard Styles */
+
+body {
+    font-family: 'Poppins', sans-serif;
+    background-color: #f8f9fa;
+    color: #333;
+    padding-top: 56px;
+}
+
+/* Sidebar */
+.sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 100;
+    padding: 48px 0 0;
+    box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1);
+    background-color: #343a40;
+}
+
+.sidebar-sticky {
+    position: relative;
+    top: 0;
+    height: calc(100vh - 48px);
+    padding-top: 0.5rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+.sidebar .nav-link {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.7);
+    padding: 0.75rem 1rem;
+    transition: all 0.3s;
+}
+
+.sidebar .nav-link:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.sidebar .nav-link.active {
+    color: #fff;
+    background-color: #198754;
+}
+
+.sidebar .nav-link .feather {
+    margin-right: 0.5rem;
+}
+
+.sidebar-heading {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: #adb5bd;
+    padding: 0.5rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.sidebar .logo {
+    padding: 0.875rem 1rem;
+    color: white;
+    font-weight: 700;
+    font-size: 1.2rem;
+}
+
+/* Main content */
+main {
+    padding-top: 1.5rem;
+}
+
+/* Stats cards */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
+
+.card .card-footer {
+    background: rgba(0, 0, 0, 0.1);
+    border-top: none;
+    padding: 0.75rem 1.25rem;
+}
+
+/* Tables */
+.table {
+    vertical-align: middle;
+}
+
+.table th {
+    border-top: none;
+    font-weight: 600;
+}
+
+/* Form Controls */
+.form-control:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+.btn-primary {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.btn-primary:hover {
+    background-color: #146c43;
+    border-color: #146c43;
+}
+
+.btn-outline-primary {
+    color: #198754;
+    border-color: #198754;
+}
+
+.btn-outline-primary:hover {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+/* Action buttons */
+.action-buttons .btn {
+    width: 35px;
+    height: 35px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin-right: 5px;
+}
+
+/* Product images in tables */
+.product-img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 5px;
+}
+
+/* Pagination */
+.pagination .page-item.active .page-link {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.pagination .page-link {
+    color: #198754;
+}
+
+.pagination .page-link:hover {
+    color: #146c43;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* Login page */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+}
+
+.login-card {
+    max-width: 400px;
+    width: 100%;
+    padding: 2rem;
+} 
