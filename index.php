@@ -59,8 +59,8 @@
                         echo '<div class="col-md-3 mb-4">';
                         echo '<div class="card h-100">';
                         // Use the image field from our database, with a fallback
-                        if (!empty($row['image'])) {
-                            echo '<img src="' . $row['image'] . '" class="card-img-top" alt="' . htmlspecialchars($row['name']) . '" style="height: 200px; object-fit: cover;">';
+                        if (!empty($row['image_path'])) {
+                            echo '<img src="' . $row['image_path'] . '" class="card-img-top" alt="' . htmlspecialchars($row['name']) . '" style="height: 200px; object-fit: cover;">';
                         } else {
                             // Default images based on category name
                             $default_image = "images/default-category.jpg";

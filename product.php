@@ -188,9 +188,9 @@ if (isset($_SESSION['user_id'])) {
                     </div>
                     
                     <div class="stock-status mb-3">
-                        <?php if ($product['quantity'] > 0): ?>
+                        <?php if ($product['stock_quantity'] > 0): ?>
                             <span class="badge bg-success"><i class="fas fa-check me-1"></i> In Stock</span>
-                            <span class="text-muted ms-2"><?php echo $product['quantity']; ?> units available</span>
+                            <span class="text-muted ms-2"><?php echo $product['stock_quantity']; ?> units available</span>
                         <?php else: ?>
                             <span class="badge bg-danger"><i class="fas fa-times me-1"></i> Out of Stock</span>
                         <?php endif; ?>
@@ -216,7 +216,7 @@ if (isset($_SESSION['user_id'])) {
                         </div>
                     <?php endif; ?>
                     
-                    <?php if ($product['quantity'] > 0): ?>
+                    <?php if ($product['stock_quantity'] > 0): ?>
                         <form action="add_to_cart.php" method="POST" class="mb-4">
                             <input type="hidden" name="product_id" value="<?php echo $product_id; ?>">
                             
@@ -224,7 +224,7 @@ if (isset($_SESSION['user_id'])) {
                                 <label for="quantity" class="me-3">Quantity:</label>
                                 <div class="quantity-input d-flex align-items-center">
                                     <button type="button" class="btn btn-outline-secondary btn-sm quantity-btn" data-action="decrease"><i class="fas fa-minus"></i></button>
-                                    <input type="number" class="form-control form-control-sm text-center mx-2" id="quantity" name="quantity" value="1" min="1" max="<?php echo $product['quantity']; ?>" style="width: 60px;">
+                                    <input type="number" class="form-control form-control-sm text-center mx-2" id="quantity" name="quantity" value="1" min="1" max="<?php echo $product['stock_quantity']; ?>" style="width: 60px;">
                                     <button type="button" class="btn btn-outline-secondary btn-sm quantity-btn" data-action="increase"><i class="fas fa-plus"></i></button>
                                 </div>
                             </div>

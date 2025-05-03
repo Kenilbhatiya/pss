@@ -38,7 +38,7 @@ if ($result && mysqli_num_rows($result) > 0) {
     $description = $product['description'];
     $price = $product['price'];
     $sale_price = $product['sale_price'] ?? '';
-    $quantity = $product['quantity'];
+    $quantity = $product['stock_quantity'];
     $category_id = $product['category_id'] ?? '';
     $featured = $product['featured'];
     $status = $product['status'];
@@ -135,7 +135,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     description = ?, 
                     price = ?, 
                     sale_price = ?, 
-                    quantity = ?, 
+                    stock_quantity = ?, 
                     image_path = ?, 
                     category_id = ?, 
                     featured = ?, 

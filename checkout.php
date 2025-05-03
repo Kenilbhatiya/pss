@@ -25,15 +25,37 @@ mysqli_stmt_execute($user_stmt);
 $user_result = mysqli_stmt_get_result($user_stmt);
 $user_data = mysqli_fetch_assoc($user_result);
 
+// Get user addresses
+$addresses_query = "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC";
+$addresses_stmt = mysqli_prepare($conn, $addresses_query);
+if ($addresses_stmt) {
+    mysqli_stmt_bind_param($addresses_stmt, "i", $user_id);
+    mysqli_stmt_execute($addresses_stmt);
+    $addresses_result = mysqli_stmt_get_result($addresses_stmt);
+    
+    $addresses = [];
+    $default_address = null;
+    
+    while ($address = mysqli_fetch_assoc($addresses_result)) {
+        $addresses[] = $address;
+        if ($address['is_default']) {
+            $default_address = $address;
+        }
+    }
+}
+
 // Get cart items
 $cart_items = [];
 $total_price = 0;
 
-$query = "SELECT c.id, c.product_id, c.quantity, p.name, p.price, p.image_path, p.quantity as stock_quantity 
+$query = "SELECT c.id, c.product_id, c.quantity, p.name, p.price, p.image_path, p.stock_quantity 
           FROM cart c 
           JOIN products p ON c.product_id = p.id 
           WHERE c.user_id = ?";
 $stmt = mysqli_prepare($conn, $query);
+if (!$stmt) {
+    die("Error preparing statement: " . mysqli_error($conn));
+}
 mysqli_stmt_bind_param($stmt, "i", $user_id);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
@@ -60,11 +82,49 @@ $total_with_tax_shipping = $total_price + $tax_amount + $shipping;
 
 // Process checkout
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
-    // Validate form data
-    $shipping_address = trim($_POST['address']) . ', ' . 
-                     trim($_POST['city']) . ', ' . 
-                     trim($_POST['state']) . ' ' . 
-                     trim($_POST['zip_code']);
+    // Get shipping address
+    $shipping_address = '';
+    
+    if (isset($_POST['selected_address']) && $_POST['selected_address'] != 'new' && !empty($addresses)) {
+        // Use selected address from saved addresses
+        $selected_id = intval($_POST['selected_address']);
+        $selected_address = null;
+        
+        foreach ($addresses as $address) {
+            if ($address['id'] == $selected_id) {
+                $selected_address = $address;
+                break;
+            }
+        }
+        
+        if ($selected_address) {
+            $shipping_address = $selected_address['address_line1'];
+            if (!empty($selected_address['address_line2'])) {
+                $shipping_address .= ', ' . $selected_address['address_line2'];
+            }
+            $shipping_address .= ', ' . $selected_address['city'] . ', ' . 
+                              $selected_address['state'] . ' ' . 
+                              $selected_address['zip_code'] . ', ' .
+                              $selected_address['country'];
+        } else {
+            $error_message = "Invalid address selected.";
+        }
+    } else {
+        // Use manually entered address
+        if (empty($_POST['address']) || empty($_POST['city']) || 
+            empty($_POST['state']) || empty($_POST['zip_code'])) {
+            $error_message = "Please fill in all required shipping details";
+        } else {
+            $shipping_address = trim($_POST['address']);
+            if (!empty($_POST['address2'])) {
+                $shipping_address .= ', ' . trim($_POST['address2']);
+            }
+            $shipping_address .= ', ' . trim($_POST['city']) . ', ' . 
+                             trim($_POST['state']) . ' ' . 
+                             trim($_POST['zip_code']) . ', ' .
+                             trim($_POST['country'] ?? 'India');
+        }
+    }
     
     $billing_address = isset($_POST['same_as_shipping']) ? $shipping_address : 
                       trim($_POST['billing_address']) . ', ' . 
@@ -72,14 +132,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                       trim($_POST['billing_state']) . ' ' . 
                       trim($_POST['billing_zip_code']);
     
-    $shipping_method = $_POST['shipping_method'];
     $payment_method = $_POST['payment_method'];
     
-    // Check if all required fields are filled
-    if (empty($_POST['address']) || empty($_POST['city']) || 
-        empty($_POST['state']) || empty($_POST['pin_code'])) {
-        $error_message = "Please fill in all required shipping details";
-    } else {
+    // Continue with order placement if no errors
+    if (empty($error_message) && !empty($shipping_address)) {
         // Begin transaction
         mysqli_begin_transaction($conn);
         
@@ -97,12 +153,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
             }
             
             // Insert order
-            $order_query = "INSERT INTO orders (user_id, total_amount, shipping_address, billing_address, 
-                          shipping_method, payment_method, status) 
-                          VALUES (?, ?, ?, ?, ?, ?, 'pending')";
+            $order_query = "INSERT INTO orders (user_id, total_amount, shipping_address, billing_address, payment_method, status) 
+                          VALUES (?, ?, ?, ?, ?, 'pending')";
             $order_stmt = mysqli_prepare($conn, $order_query);
-            mysqli_stmt_bind_param($order_stmt, "idssss", $user_id, $total_with_tax_shipping, 
-                                 $shipping_address, $billing_address, $shipping_method, $payment_method);
+            mysqli_stmt_bind_param($order_stmt, "idsss", $user_id, $total_with_tax_shipping, 
+                                 $shipping_address, $billing_address, $payment_method);
             
             if (!mysqli_stmt_execute($order_stmt)) {
                 throw new Exception("Failed to create order: " . mysqli_error($conn));
@@ -124,7 +179,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
                 }
                 
                 // Update product quantity
-                $update_product_query = "UPDATE products SET quantity = quantity - ? WHERE id = ?";
+                $update_product_query = "UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?";
                 $update_product_stmt = mysqli_prepare($conn, $update_product_query);
                 mysqli_stmt_bind_param($update_product_stmt, "ii", $item['quantity'], $item['product_id']);
                 
@@ -243,24 +298,69 @@ if (isset($_POST['apply_coupon']) && !empty($_POST['coupon'])) {
                                     <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user_data['phone'] ?? ''); ?>" required>
                                 </div>
                                 
+                                <?php if (!empty($addresses)): ?>
+                                <div class="mb-4">
+                                    <label class="form-label">Select a Delivery Address</label>
+                                    <?php foreach ($addresses as $index => $address): ?>
+                                        <div class="form-check mb-2 border p-3 <?php echo $address['is_default'] ? 'border-success' : ''; ?>">
+                                            <input class="form-check-input" type="radio" name="selected_address" id="address<?php echo $index; ?>" value="<?php echo $address['id']; ?>" <?php echo $address['is_default'] ? 'checked' : ''; ?>>
+                                            <label class="form-check-label" for="address<?php echo $index; ?>">
+                                                <strong>
+                                                    <?php echo htmlspecialchars(ucfirst($address['address_type'])); ?> Address
+                                                    <?php if ($address['is_default']): ?>
+                                                        <span class="badge bg-success">Default</span>
+                                                    <?php endif; ?>
+                                                </strong><br>
+                                                <?php echo htmlspecialchars($user_data['first_name'] . ' ' . $user_data['last_name']); ?><br>
+                                                <?php echo htmlspecialchars($address['address_line1']); ?><br>
+                                                <?php if (!empty($address['address_line2'])): ?>
+                                                    <?php echo htmlspecialchars($address['address_line2']); ?><br>
+                                                <?php endif; ?>
+                                                <?php echo htmlspecialchars($address['city'] . ', ' . $address['state'] . ' ' . $address['zip_code']); ?><br>
+                                                <?php echo htmlspecialchars($address['country']); ?>
+                                            </label>
+                                        </div>
+                                    <?php endforeach; ?>
+                                    
+                                    <div class="form-check mb-2 border p-3">
+                                        <input class="form-check-input" type="radio" name="selected_address" id="newAddress" value="new">
+                                        <label class="form-check-label" for="newAddress">
+                                            <strong>Add a New Address</strong>
+                                        </label>
+                                    </div>
+                                </div>
+                                
+                                <div id="newAddressForm" style="display: none;">
+                                <?php endif; ?>
+                                
                                 <div class="mb-3">
-                                    <label for="address" class="form-label">Street Address *</label>
-                                    <input type="text" class="form-control" id="address" name="address" value="<?php echo htmlspecialchars($user_data['address'] ?? ''); ?>" required>
+                                    <label for="address" class="form-label">Address *</label>
+                                    <input type="text" class="form-control" id="address" name="address" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['address_line1']) : ''; ?>" <?php echo !empty($addresses) ? '' : 'required'; ?>>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="address2" class="form-label">Address 2 (Optional)</label>
+                                    <input type="text" class="form-control" id="address2" name="address2" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['address_line2']) : ''; ?>">
                                 </div>
                                 
                                 <div class="row">
-                                    <div class="col-md-6 mb-3">
+                                    <div class="col-md-5 mb-3">
                                         <label for="city" class="form-label">City *</label>
-                                        <input type="text" class="form-control" id="city" name="city" value="<?php echo htmlspecialchars($user_data['city'] ?? ''); ?>" required>
+                                        <input type="text" class="form-control" id="city" name="city" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['city']) : ''; ?>" <?php echo !empty($addresses) ? '' : 'required'; ?>>
                                     </div>
-                                    <div class="col-md-3 mb-3">
+                                    <div class="col-md-4 mb-3">
                                         <label for="state" class="form-label">State *</label>
-                                        <input type="text" class="form-control" id="state" name="state" value="<?php echo htmlspecialchars($user_data['state'] ?? ''); ?>" required>
+                                        <input type="text" class="form-control" id="state" name="state" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['state']) : ''; ?>" <?php echo !empty($addresses) ? '' : 'required'; ?>>
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label for="pin_code" class="form-label">PIN Code *</label>
-                                        <input type="text" class="form-control" id="pin_code" name="pin_code" value="<?php echo htmlspecialchars($user_data['pin_code'] ?? ''); ?>" required>
+                                        <label for="zip_code" class="form-label">ZIP Code *</label>
+                                        <input type="text" class="form-control" id="zip_code" name="zip_code" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['zip_code']) : ''; ?>" <?php echo !empty($addresses) ? '' : 'required'; ?>>
                                     </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="country" class="form-label">Country *</label>
+                                    <input type="text" class="form-control" id="country" name="country" value="<?php echo isset($default_address) ? htmlspecialchars($default_address['country']) : 'India'; ?>" <?php echo !empty($addresses) ? '' : 'required'; ?>>
                                 </div>
                             </div>
                         </div>
@@ -291,35 +391,9 @@ if (isset($_POST['apply_coupon']) && !empty($_POST['coupon'])) {
                                         <input type="text" class="form-control" id="billing_state" name="billing_state">
                                     </div>
                                     <div class="col-md-3 mb-3">
-                                        <label for="billing_pin_code" class="form-label">PIN Code *</label>
-                                        <input type="text" class="form-control" id="billing_pin_code" name="billing_pin_code">
+                                        <label for="billing_zip_code" class="form-label">ZIP Code *</label>
+                                        <input type="text" class="form-control" id="billing_zip_code" name="billing_zip_code">
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-header bg-white py-3">
-                                <h5 class="mb-0">Shipping Method</h5>
-                            </div>
-                            <div class="card-body p-4">
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="radio" name="shipping_method" id="standard_shipping" value="standard" checked>
-                                    <label class="form-check-label" for="standard_shipping">
-                                        <span class="d-flex justify-content-between">
-                                            <span><strong>Standard Shipping</strong> (2-5 business days)</span>
-                                            <span>$5.99</span>
-                                        </span>
-                                    </label>
-                                </div>
-                                <div class="form-check mb-3">
-                                    <input class="form-check-input" type="radio" name="shipping_method" id="express_shipping" value="express">
-                                    <label class="form-check-label" for="express_shipping">
-                                        <span class="d-flex justify-content-between">
-                                            <span><strong>Express Shipping</strong> (1-2 business days)</span>
-                                            <span>$12.99</span>
-                                        </span>
-                                    </label>
                                 </div>
                             </div>
                         </div>
@@ -476,36 +550,55 @@ if (isset($_POST['apply_coupon']) && !empty($_POST['coupon'])) {
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Custom JavaScript -->
     <script>
-        // Toggle billing address form
-        document.getElementById('same_as_shipping').addEventListener('change', function() {
-            const billingForm = document.querySelector('.billing-address-form');
-            if (this.checked) {
-                billingForm.classList.add('d-none');
-            } else {
-                billingForm.classList.remove('d-none');
-            }
-        });
-        
-        // Toggle payment method details
-        document.querySelectorAll('input[name="payment_method"]').forEach(function(radio) {
-            radio.addEventListener('change', function() {
-                const creditCardDetails = document.getElementById('credit_card_details');
-                if (this.value === 'credit_card') {
-                    creditCardDetails.classList.remove('d-none');
-                } else {
-                    creditCardDetails.classList.add('d-none');
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle address selection toggling
+            const addressRadios = document.querySelectorAll('input[name="selected_address"]');
+            const newAddressForm = document.getElementById('newAddressForm');
+            const addressFields = document.querySelectorAll('#newAddressForm input');
+            
+            if (addressRadios.length > 0 && newAddressForm) {
+                addressRadios.forEach(radio => {
+                    radio.addEventListener('change', function() {
+                        if (this.value === 'new') {
+                            newAddressForm.style.display = 'block';
+                            // Make address fields required
+                            addressFields.forEach(field => {
+                                if (field.id !== 'address2') { // Skip optional field
+                                    field.setAttribute('required', 'required');
+                                }
+                            });
+                        } else {
+                            newAddressForm.style.display = 'none';
+                            // Remove required attribute
+                            addressFields.forEach(field => {
+                                field.removeAttribute('required');
+                            });
+                        }
+                    });
+                });
+                
+                // Trigger the change event on page load to set the initial state
+                const checkedRadio = document.querySelector('input[name="selected_address"]:checked');
+                if (checkedRadio) {
+                    checkedRadio.dispatchEvent(new Event('change'));
                 }
-            });
-        });
-        
-        // Update shipping cost based on method
-        document.querySelectorAll('input[name="shipping_method"]').forEach(function(radio) {
-            radio.addEventListener('change', function() {
-                // This would be replaced with an AJAX call to update the order total
-                // For now it's just a placeholder
-                console.log('Shipping method changed to: ' + this.value);
-            });
+            }
+            
+            // Handle same as shipping checkbox
+            const sameAsShippingCheckbox = document.getElementById('same_as_shipping');
+            const billingAddressSection = document.getElementById('billing_address_section');
+            
+            if (sameAsShippingCheckbox && billingAddressSection) {
+                sameAsShippingCheckbox.addEventListener('change', function() {
+                    billingAddressSection.style.display = this.checked ? 'none' : 'block';
+                });
+                
+                // Trigger the change event on page load
+                sameAsShippingCheckbox.dispatchEvent(new Event('change'));
+            }
         });
     </script>
 </body>

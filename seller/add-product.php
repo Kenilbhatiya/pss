@@ -2,8 +2,8 @@
 // Start session
 session_start();
 
-// Check if user is logged in as admin
-if(!isset($_SESSION['admin_id'])) {
+// Check if user is logged in as admin or seller
+if(!isset($_SESSION['admin_id']) && !isset($_SESSION['seller_id'])) {
     header("Location: login.php");
     exit();
 }
@@ -104,7 +104,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     // If no errors, proceed with database insertion
     if (empty($errors)) {
-        $query = "INSERT INTO products (name, description, price, sale_price, quantity, image_path, category_id, featured, status) 
+        $query = "INSERT INTO products (name, description, price, sale_price, stock_quantity, image_path, category_id, featured, status) 
                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         $stmt = mysqli_prepare($conn, $query);
@@ -142,7 +142,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="container-fluid">

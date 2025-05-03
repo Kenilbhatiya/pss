@@ -25,8 +25,8 @@ if (isset($_GET['id']) && is_numeric($_GET['id'])) {
     // Default quantity is 1 if not specified
     $quantity = isset($_GET['quantity']) ? max(1, intval($_GET['quantity'])) : 1;
     
-    // Check if product exists and is in stock
-    $check_query = "SELECT id, name, price, quantity FROM products WHERE id = ?";
+    // Check if product exists and has stock
+    $check_query = "SELECT id, name, price, stock_quantity as quantity FROM products WHERE id = ?";
     $check_stmt = mysqli_prepare($conn, $check_query);
     mysqli_stmt_bind_param($check_stmt, "i", $product_id);
     mysqli_stmt_execute($check_stmt);

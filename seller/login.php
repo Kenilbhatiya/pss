@@ -3,7 +3,10 @@
 session_start();
 
 // Redirect if already logged in
-if(isset($_SESSION['admin_id'])) {
+if(isset($_SESSION['seller_id'])) {
+    header("Location: add-product.php");
+    exit();
+} elseif(isset($_SESSION['admin_id'])) {
     header("Location: index.php");
     exit();
 }
@@ -25,8 +28,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if (empty($username) || empty($password)) {
         $error = "Username and password are required";
     } else {
-        // Query for admin user
-        $query = "SELECT * FROM users WHERE username = ? AND admin = 1";
+        // Query for user (any type)
+        $query = "SELECT * FROM users WHERE username = ?";
         $stmt = mysqli_prepare($conn, $query);
         mysqli_stmt_bind_param($stmt, "s", $username);
         mysqli_stmt_execute($stmt);
@@ -37,13 +40,29 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             // Verify password
             if (password_verify($password, $user['password'])) {
-                // Set session variables
-                $_SESSION['admin_id'] = $user['id'];
-                $_SESSION['admin_username'] = $user['username'];
-                
-                // Redirect to dashboard
-                header("Location: index.php");
-                exit();
+                // Set session variables based on user type
+                if ($user['user_type'] == 'seller') {
+                    $_SESSION['seller_id'] = $user['id'];
+                    $_SESSION['seller_username'] = $user['username'];
+                    
+                    // Redirect seller to add product page
+                    header("Location: add-product.php");
+                    exit();
+                } elseif ($user['user_type'] == 'admin') {
+                    $_SESSION['admin_id'] = $user['id'];
+                    $_SESSION['admin_username'] = $user['username'];
+                    
+                    // Redirect admin to dashboard
+                    header("Location: index.php");
+                    exit();
+                } elseif ($user['user_type'] == 'buyer') {
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    
+                    // Redirect buyer to main site
+                    header("Location: ../index.php");
+                    exit();
+                }
             } else {
                 $error = "Invalid username or password";
             }
@@ -59,12 +78,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Login - Plant Nursery</title>
+    <title>Seller Login - Plant Nursery</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="login-container">
@@ -72,8 +91,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="card-body">
                 <div class="text-center mb-4">
                     <i class="fas fa-leaf text-success fa-3x mb-3"></i>
-                    <h3>Plant Nursery Admin</h3>
-                    <p class="text-muted">Enter your credentials to access the admin panel</p>
+                    <h3>Plant Nursery Seller</h3>
+                    <p class="text-muted">Enter your credentials to access the seller panel</p>
                 </div>
                 
                 <?php if(!empty($error)): ?>

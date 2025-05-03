@@ -1,12 +1,12 @@
 <?php
-if (!isset($_SESSION['admin_id'])) {
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['seller_id'])) {
     header('Location: login.php');
     exit();
 }
 ?>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
     <div class="container-fluid">
-        <a class="navbar-brand" href="index.php">Plant Nursery Admin</a>
+        <a class="navbar-brand" href="index.php">Plant Nursery Seller Dashboard</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -14,7 +14,15 @@ if (!isset($_SESSION['admin_id'])) {
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        <i class="fas fa-user"></i> <?php echo isset($_SESSION['admin_username']) ? htmlspecialchars($_SESSION['admin_username']) : 'Admin'; ?>
+                        <i class="fas fa-user"></i> <?php 
+                            if (isset($_SESSION['admin_username'])) {
+                                echo htmlspecialchars($_SESSION['admin_username']);
+                            } elseif (isset($_SESSION['seller_username'])) {
+                                echo htmlspecialchars($_SESSION['seller_username']);
+                            } else {
+                                echo 'Seller';
+                            }
+                        ?>
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
                         <li><a class="dropdown-item" href="profile.php">Profile</a></li>

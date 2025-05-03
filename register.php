@@ -18,6 +18,15 @@ $first_name = "";
 $last_name = "";
 $password = "";
 $confirm_password = "";
+$user_type = "buyer"; // Default to buyer
+$phone = "";
+$address_line1 = "";
+$address_line2 = "";
+$city = "";
+$state = "";
+$zip_code = "";
+$country = "";
+$address_type = "home";
 $errors = [];
 
 // Process registration form
@@ -29,6 +38,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $last_name = trim($_POST['last_name']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
+    $user_type = $_POST['user_type'];
+    $phone = trim($_POST['phone'] ?? '');
+    $address_line1 = trim($_POST['address_line1'] ?? '');
+    $address_line2 = trim($_POST['address_line2'] ?? '');
+    $city = trim($_POST['city'] ?? '');
+    $state = trim($_POST['state'] ?? '');
+    $zip_code = trim($_POST['zip_code'] ?? '');
+    $country = trim($_POST['country'] ?? '');
+    $address_type = $_POST['address_type'] ?? 'home';
     
     // Validation
     if (empty($username)) {
@@ -86,18 +104,46 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Hash password
         $password_hash = password_hash($password, PASSWORD_DEFAULT);
         
-        // Insert user
-        $query = "INSERT INTO users (username, email, password, first_name, last_name) VALUES (?, ?, ?, ?, ?)";
-        $stmt = mysqli_prepare($conn, $query);
-        mysqli_stmt_bind_param($stmt, "sssss", $username, $email, $password_hash, $first_name, $last_name);
+        // Start transaction
+        mysqli_begin_transaction($conn);
         
-        if (mysqli_stmt_execute($stmt)) {
+        try {
+            // Insert user
+            $query = "INSERT INTO users (username, email, password, first_name, last_name, user_type, phone) VALUES (?, ?, ?, ?, ?, ?, ?)";
+            $stmt = mysqli_prepare($conn, $query);
+            mysqli_stmt_bind_param($stmt, "sssssss", $username, $email, $password_hash, $first_name, $last_name, $user_type, $phone);
+            
+            if (!mysqli_stmt_execute($stmt)) {
+                throw new Exception("Error inserting user: " . mysqli_error($conn));
+            }
+            
+            // Get the user ID
+            $user_id = mysqli_insert_id($conn);
+            
+            // Insert address if address line 1 is provided
+            if (!empty($address_line1)) {
+                $query = "INSERT INTO user_addresses (user_id, address_line1, address_line2, city, state, zip_code, country, address_type, is_default) 
+                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)";
+                $stmt = mysqli_prepare($conn, $query);
+                mysqli_stmt_bind_param($stmt, "isssssss", $user_id, $address_line1, $address_line2, $city, $state, $zip_code, $country, $address_type);
+                
+                if (!mysqli_stmt_execute($stmt)) {
+                    throw new Exception("Error inserting address: " . mysqli_error($conn));
+                }
+            }
+            
+            // If we got here, commit the transaction
+            mysqli_commit($conn);
+            
             // Set success message and redirect to login
             $_SESSION['registration_success'] = "Registration successful! You can now login with your credentials.";
             header("Location: login.php");
             exit();
-        } else {
-            $errors[] = "Registration failed. Please try again later.";
+            
+        } catch (Exception $e) {
+            // Something went wrong, rollback the transaction
+            mysqli_rollback($conn);
+            $errors[] = "Registration failed: " . $e->getMessage();
         }
     }
 }
@@ -141,6 +187,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                             <?php endif; ?>
                             
                             <form method="POST" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
+                                <div class="mb-3">
+                                    <label class="form-label">User Type</label>
+                                    <div class="d-flex gap-4">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="user_type" id="userTypeBuyer" value="buyer" checked>
+                                            <label class="form-check-label" for="userTypeBuyer">
+                                                Buyer
+                                            </label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="user_type" id="userTypeSeller" value="seller">
+                                            <label class="form-check-label" for="userTypeSeller">
+                                                Seller
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <label for="first_name" class="form-label">First Name</label>
@@ -160,6 +224,52 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                 <div class="mb-3">
                                     <label for="email" class="form-label">Email Address</label>
                                     <input type="email" class="form-control" id="email" name="email" value="<?php echo htmlspecialchars($email); ?>" required>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="phone" class="form-label">Phone Number</label>
+                                    <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($phone); ?>">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="address_line1" class="form-label">Address Line 1</label>
+                                    <input type="text" class="form-control" id="address_line1" name="address_line1" value="<?php echo htmlspecialchars($address_line1); ?>" placeholder="Street address, P.O. box, company name">
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="address_line2" class="form-label">Address Line 2 <span class="text-muted">(Optional)</span></label>
+                                    <input type="text" class="form-control" id="address_line2" name="address_line2" value="<?php echo htmlspecialchars($address_line2); ?>" placeholder="Apartment, suite, unit, building, floor, etc.">
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="city" class="form-label">City</label>
+                                        <input type="text" class="form-control" id="city" name="city" value="<?php echo htmlspecialchars($city); ?>">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="state" class="form-label">State/Province</label>
+                                        <input type="text" class="form-control" id="state" name="state" value="<?php echo htmlspecialchars($state); ?>">
+                                    </div>
+                                </div>
+                                
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="zip_code" class="form-label">ZIP/Postal Code</label>
+                                        <input type="text" class="form-control" id="zip_code" name="zip_code" value="<?php echo htmlspecialchars($zip_code); ?>">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="country" class="form-label">Country</label>
+                                        <input type="text" class="form-control" id="country" name="country" value="<?php echo htmlspecialchars($country); ?>" placeholder="India">
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-3">
+                                    <label for="address_type" class="form-label">Address Type</label>
+                                    <select class="form-select" id="address_type" name="address_type">
+                                        <option value="home" <?php echo $address_type == 'home' ? 'selected' : ''; ?>>Home</option>
+                                        <option value="work" <?php echo $address_type == 'work' ? 'selected' : ''; ?>>Work</option>
+                                        <option value="other" <?php echo $address_type == 'other' ? 'selected' : ''; ?>>Other</option>
+                                    </select>
                                 </div>
                                 
                                 <div class="mb-3">

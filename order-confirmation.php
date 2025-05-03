@@ -62,9 +62,7 @@ while ($item = mysqli_fetch_assoc($items_result)) {
 $tax_rate = 0.07; // 7% tax
 $tax_amount = $subtotal * $tax_rate;
 $shipping = 5.99; // Standard shipping
-if ($order['shipping_method'] === 'express') {
-    $shipping = 12.99; // Express shipping
-}
+
 ?>
 
 <!DOCTYPE html>
@@ -173,7 +171,7 @@ if ($order['shipping_method'] === 'express') {
                                             <td class="text-end">₹<?php echo number_format($tax_amount, 2); ?></td>
                                         </tr>
                                         <tr>
-                                            <td colspan="3" class="text-end">Shipping (<?php echo ucfirst($order['shipping_method']); ?>):</td>
+                                            <td colspan="3" class="text-end">Shipping:</td>
                                             <td class="text-end">₹<?php echo number_format($shipping, 2); ?></td>
                                         </tr>
                                         <tr>

@@ -2,8 +2,8 @@
 // Start session
 session_start();
 
-// Check if user is logged in as admin
-if(!isset($_SESSION['admin_id'])) {
+// Check if user is logged in as seller
+if(!isset($_SESSION['seller_id'])) {
     header("Location: login.php");
     exit();
 }
@@ -64,7 +64,7 @@ if($result) {
 
 // Get low stock products
 $lowStockProducts = [];
-$query = "SELECT id, name, quantity, image_path FROM products WHERE quantity < 10 ORDER BY quantity ASC LIMIT 5";
+$query = "SELECT id, name, stock_quantity as quantity, image_path FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC LIMIT 5";
 $result = mysqli_query($conn, $query);
 if($result) {
     while($row = mysqli_fetch_assoc($result)) {
@@ -78,12 +78,12 @@ if($result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Plant Nursery</title>
+    <title>Seller Dashboard - Plant Nursery</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="container-fluid">

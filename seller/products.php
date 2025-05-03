@@ -220,12 +220,12 @@ if ($count_result) {
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>
-                                                    <?php if($product['quantity'] <= 5): ?>
-                                                        <span class="badge bg-danger"><?php echo $product['quantity']; ?></span>
-                                                    <?php elseif($product['quantity'] <= 20): ?>
-                                                        <span class="badge bg-warning text-dark"><?php echo $product['quantity']; ?></span>
+                                                    <?php if($product['stock_quantity'] <= 5): ?>
+                                                        <span class="badge bg-danger"><?php echo $product['stock_quantity']; ?></span>
+                                                    <?php elseif($product['stock_quantity'] <= 20): ?>
+                                                        <span class="badge bg-warning text-dark"><?php echo $product['stock_quantity']; ?></span>
                                                     <?php else: ?>
-                                                        <span class="badge bg-success"><?php echo $product['quantity']; ?></span>
+                                                        <span class="badge bg-success"><?php echo $product['stock_quantity']; ?></span>
                                                     <?php endif; ?>
                                                 </td>
                                                 <td>

@@ -6,6 +6,12 @@ session_start();
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
+} elseif (isset($_SESSION['seller_id'])) {
+    header("Location: seller/add-product.php");
+    exit();
+} elseif (isset($_SESSION['admin_id'])) {
+    header("Location: seller/index.php");
+    exit();
 }
 
 // Include database connection
@@ -44,15 +50,31 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             
             // Verify password
             if (password_verify($password, $user['password'])) {
-                // Set session variables
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['username'] = $user['username'];
-                
-                // Redirect to homepage or to the page user came from
-                $redirect = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'index.php';
-                unset($_SESSION['redirect_after_login']);
-                header("Location: $redirect");
-                exit();
+                // Set session variables based on user type
+                if ($user['user_type'] == 'buyer') {
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    
+                    // Redirect to homepage or to the page user came from
+                    $redirect = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'index.php';
+                    unset($_SESSION['redirect_after_login']);
+                    header("Location: $redirect");
+                    exit();
+                } elseif ($user['user_type'] == 'seller') {
+                    $_SESSION['seller_id'] = $user['id'];
+                    $_SESSION['seller_username'] = $user['username'];
+                    
+                    // Redirect seller to add-product page
+                    header("Location: seller/add-product.php");
+                    exit();
+                } elseif ($user['user_type'] == 'admin') {
+                    $_SESSION['admin_id'] = $user['id'];
+                    $_SESSION['admin_username'] = $user['username'];
+                    
+                    // Redirect admin to admin dashboard
+                    header("Location: seller/index.php");
+                    exit();
+                }
             } else {
                 $error = "Invalid username or password";
             }

@@ -21,17 +21,22 @@ $error_message = "";
 $user = [];
 $query = "SELECT * FROM users WHERE id = ?";
 $stmt = mysqli_prepare($conn, $query);
-mysqli_stmt_bind_param($stmt, "i", $user_id);
-mysqli_stmt_execute($stmt);
-$result = mysqli_stmt_get_result($stmt);
-
-if ($result && mysqli_num_rows($result) > 0) {
-    $user = mysqli_fetch_assoc($result);
+if ($stmt) {
+    mysqli_stmt_bind_param($stmt, "i", $user_id);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    
+    if ($result && mysqli_num_rows($result) > 0) {
+        $user = mysqli_fetch_assoc($result);
+    } else {
+        // Invalid user ID, logout and redirect
+        session_destroy();
+        header("Location: login.php");
+        exit();
+    }
 } else {
-    // Invalid user ID, logout and redirect
-    session_destroy();
-    header("Location: login.php");
-    exit();
+    // Database error
+    $error_message = "Database error: " . mysqli_error($conn);
 }
 
 // Process profile update form
@@ -40,10 +45,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     $last_name = trim($_POST['last_name']);
     $email = trim($_POST['email']);
     $phone = trim($_POST['phone']);
-    $address = trim($_POST['address']);
-    $city = trim($_POST['city']);
-    $state = trim($_POST['state']);
-    $zip_code = trim($_POST['zip_code']);
     
     // Validation
     $errors = [];
@@ -74,9 +75,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
     
     // If no errors, update profile
     if (empty($errors)) {
-        $update_query = "UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ?, address = ?, city = ?, state = ?, zip_code = ? WHERE id = ?";
+        $update_query = "UPDATE users SET first_name = ?, last_name = ?, email = ?, phone = ? WHERE id = ?";
         $update_stmt = mysqli_prepare($conn, $update_query);
-        mysqli_stmt_bind_param($update_stmt, "ssssssssi", $first_name, $last_name, $email, $phone, $address, $city, $state, $zip_code, $user_id);
+        mysqli_stmt_bind_param($update_stmt, "ssssi", $first_name, $last_name, $email, $phone, $user_id);
         
         if (mysqli_stmt_execute($update_stmt)) {
             $success_message = "Profile updated successfully!";
@@ -85,10 +86,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_profile'])) {
             $user['last_name'] = $last_name;
             $user['email'] = $email;
             $user['phone'] = $phone;
-            $user['address'] = $address;
-            $user['city'] = $city;
-            $user['state'] = $state;
-            $user['zip_code'] = $zip_code;
         } else {
             $error_message = "Failed to update profile. Please try again.";
         }
@@ -138,13 +135,15 @@ $orders_query = "SELECT o.*, COUNT(oi.id) as item_count
                 GROUP BY o.id 
                 ORDER BY o.created_at DESC";
 $orders_stmt = mysqli_prepare($conn, $orders_query);
-mysqli_stmt_bind_param($orders_stmt, "i", $user_id);
-mysqli_stmt_execute($orders_stmt);
-$orders_result = mysqli_stmt_get_result($orders_stmt);
-
-if ($orders_result) {
-    while ($row = mysqli_fetch_assoc($orders_result)) {
-        $orders[] = $row;
+if ($orders_stmt) {
+    mysqli_stmt_bind_param($orders_stmt, "i", $user_id);
+    mysqli_stmt_execute($orders_stmt);
+    $orders_result = mysqli_stmt_get_result($orders_stmt);
+    
+    if ($orders_result) {
+        while ($row = mysqli_fetch_assoc($orders_result)) {
+            $orders[] = $row;
+        }
     }
 }
 
@@ -156,13 +155,31 @@ $wishlist_query = "SELECT w.id as wishlist_id, p.*
                   WHERE w.user_id = ? 
                   ORDER BY w.created_at DESC";
 $wishlist_stmt = mysqli_prepare($conn, $wishlist_query);
-mysqli_stmt_bind_param($wishlist_stmt, "i", $user_id);
-mysqli_stmt_execute($wishlist_stmt);
-$wishlist_result = mysqli_stmt_get_result($wishlist_stmt);
+if ($wishlist_stmt) {
+    mysqli_stmt_bind_param($wishlist_stmt, "i", $user_id);
+    mysqli_stmt_execute($wishlist_stmt);
+    $wishlist_result = mysqli_stmt_get_result($wishlist_stmt);
+    
+    if ($wishlist_result) {
+        while ($row = mysqli_fetch_assoc($wishlist_result)) {
+            $wishlist_items[] = $row;
+        }
+    }
+}
 
-if ($wishlist_result) {
-    while ($row = mysqli_fetch_assoc($wishlist_result)) {
-        $wishlist_items[] = $row;
+// Get user addresses
+$addresses = [];
+$addresses_query = "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC";
+$addresses_stmt = mysqli_prepare($conn, $addresses_query);
+if ($addresses_stmt) {
+    mysqli_stmt_bind_param($addresses_stmt, "i", $user_id);
+    mysqli_stmt_execute($addresses_stmt);
+    $addresses_result = mysqli_stmt_get_result($addresses_stmt);
+    
+    if ($addresses_result) {
+        while ($row = mysqli_fetch_assoc($addresses_result)) {
+            $addresses[] = $row;
+        }
     }
 }
 ?>
@@ -235,6 +252,9 @@ if ($wishlist_result) {
                                 </a>
                                 <a class="list-group-item list-group-item-action" id="wishlist-tab" data-bs-toggle="list" href="#wishlist" role="tab" aria-controls="wishlist" aria-selected="false">
                                     <i class="fas fa-heart me-2"></i> Wishlist
+                                </a>
+                                <a class="list-group-item list-group-item-action" id="addresses-tab" data-bs-toggle="list" href="#addresses" role="tab" aria-controls="addresses" aria-selected="false">
+                                    <i class="fas fa-map-marker-alt me-2"></i> Addresses
                                 </a>
                                 <a class="list-group-item list-group-item-action" id="profile-tab" data-bs-toggle="list" href="#profile" role="tab" aria-controls="profile" aria-selected="false">
                                     <i class="fas fa-user me-2"></i> Profile Details
@@ -454,6 +474,84 @@ if ($wishlist_result) {
                                     <?php endif; ?>
                                 </div>
                                 
+                                <!-- Addresses Tab -->
+                                <div class="tab-pane fade" id="addresses" role="tabpanel" aria-labelledby="addresses-tab">
+                                    <div class="d-flex justify-content-between align-items-center mb-4">
+                                        <h3>My Addresses</h3>
+                                        <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#addAddressModal">
+                                            <i class="fas fa-plus me-1"></i> Add New Address
+                                        </button>
+                                    </div>
+                                    
+                                    <?php if (count($addresses) > 0): ?>
+                                        <div class="row">
+                                            <?php foreach ($addresses as $address): ?>
+                                                <div class="col-lg-6 mb-4">
+                                                    <div class="card h-100 border <?php echo $address['is_default'] ? 'border-success' : ''; ?>">
+                                                        <div class="card-header bg-transparent d-flex justify-content-between align-items-center">
+                                                            <span>
+                                                                <i class="fas <?php 
+                                                                    switch($address['address_type']) {
+                                                                        case 'home': echo 'fa-home'; break;
+                                                                        case 'work': echo 'fa-briefcase'; break;
+                                                                        default: echo 'fa-map-marker-alt';
+                                                                    }
+                                                                ?> me-2"></i>
+                                                                <?php echo ucfirst($address['address_type']); ?> Address
+                                                                <?php if ($address['is_default']): ?>
+                                                                    <span class="badge bg-success ms-2">Default</span>
+                                                                <?php endif; ?>
+                                                            </span>
+                                                        </div>
+                                                        <div class="card-body">
+                                                            <address class="mb-0">
+                                                                <strong><?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?></strong><br>
+                                                                <?php echo htmlspecialchars($address['address_line1']); ?><br>
+                                                                <?php if (!empty($address['address_line2'])): ?>
+                                                                    <?php echo htmlspecialchars($address['address_line2']); ?><br>
+                                                                <?php endif; ?>
+                                                                <?php echo htmlspecialchars($address['city'] . ', ' . $address['state'] . ' ' . $address['zip_code']); ?><br>
+                                                                <?php echo htmlspecialchars($address['country']); ?>
+                                                            </address>
+                                                        </div>
+                                                        <div class="card-footer bg-transparent">
+                                                            <div class="btn-group w-100">
+                                                                <button type="button" class="btn btn-sm btn-outline-primary edit-address-btn" 
+                                                                        data-id="<?php echo $address['id']; ?>"
+                                                                        data-line1="<?php echo htmlspecialchars($address['address_line1']); ?>"
+                                                                        data-line2="<?php echo htmlspecialchars($address['address_line2']); ?>"
+                                                                        data-city="<?php echo htmlspecialchars($address['city']); ?>"
+                                                                        data-state="<?php echo htmlspecialchars($address['state']); ?>"
+                                                                        data-zip="<?php echo htmlspecialchars($address['zip_code']); ?>"
+                                                                        data-country="<?php echo htmlspecialchars($address['country']); ?>"
+                                                                        data-type="<?php echo htmlspecialchars($address['address_type']); ?>"
+                                                                        data-default="<?php echo $address['is_default']; ?>"
+                                                                        data-bs-toggle="modal" data-bs-target="#editAddressModal">
+                                                                    <i class="fas fa-edit me-1"></i> Edit
+                                                                </button>
+                                                                <?php if (!$address['is_default']): ?>
+                                                                    <a href="set_default_address.php?id=<?php echo $address['id']; ?>" class="btn btn-sm btn-outline-success">
+                                                                        Set as Default
+                                                                    </a>
+                                                                <?php endif; ?>
+                                                                <?php if (count($addresses) > 1): ?>
+                                                                    <a href="delete_address.php?id=<?php echo $address['id']; ?>" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this address?');">
+                                                                        <i class="fas fa-trash me-1"></i> Delete
+                                                                    </a>
+                                                                <?php endif; ?>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="alert alert-info">
+                                            <p>You haven't added any addresses yet. Add a new address to manage your shipping options.</p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+                                
                                 <!-- Profile Tab -->
                                 <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
                                     <h3 class="mb-4">Profile Details</h3>
@@ -485,26 +583,6 @@ if ($wishlist_result) {
                                         <div class="mb-3">
                                             <label for="phone" class="form-label">Phone Number</label>
                                             <input type="tel" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($user['phone'] ?? ''); ?>">
-                                        </div>
-                                        
-                                        <div class="mb-3">
-                                            <label for="address" class="form-label">Address</label>
-                                            <input type="text" class="form-control" id="address" name="address" value="<?php echo htmlspecialchars($user['address'] ?? ''); ?>">
-                                        </div>
-                                        
-                                        <div class="row">
-                                            <div class="col-md-4 mb-3">
-                                                <label for="city" class="form-label">City</label>
-                                                <input type="text" class="form-control" id="city" name="city" value="<?php echo htmlspecialchars($user['city'] ?? ''); ?>">
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="state" class="form-label">State</label>
-                                                <input type="text" class="form-control" id="state" name="state" value="<?php echo htmlspecialchars($user['state'] ?? ''); ?>">
-                                            </div>
-                                            <div class="col-md-4 mb-3">
-                                                <label for="zip_code" class="form-label">ZIP Code</label>
-                                                <input type="text" class="form-control" id="zip_code" name="zip_code" value="<?php echo htmlspecialchars($user['zip_code'] ?? ''); ?>">
-                                            </div>
                                         </div>
                                         
                                         <button type="submit" name="update_profile" class="btn btn-success">Update Profile</button>
@@ -545,8 +623,188 @@ if ($wishlist_result) {
 
     <?php include_once("includes/footer.php"); ?>
 
+    <!-- Add Address Modal -->
+    <div class="modal fade" id="addAddressModal" tabindex="-1" aria-labelledby="addAddressModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addAddressModalLabel">Add New Address</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="add_address.php" method="POST">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="new_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="new_address_line1" name="address_line1" placeholder="Street address, P.O. box, company name" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="new_address_line2" class="form-label">Address Line 2 <span class="text-muted">(Optional)</span></label>
+                            <input type="text" class="form-control" id="new_address_line2" name="address_line2" placeholder="Apartment, suite, unit, building, floor, etc.">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="new_city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="new_city" name="city" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="new_state" class="form-label">State/Province</label>
+                                <input type="text" class="form-control" id="new_state" name="state" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="new_zip_code" class="form-label">ZIP/Postal Code</label>
+                                <input type="text" class="form-control" id="new_zip_code" name="zip_code" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="new_country" class="form-label">Country</label>
+                                <input type="text" class="form-control" id="new_country" name="country" value="India">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="new_address_type" class="form-label">Address Type</label>
+                                <select class="form-select" id="new_address_type" name="address_type">
+                                    <option value="home">Home</option>
+                                    <option value="work">Work</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="new_is_default" name="is_default" value="1" <?php echo count($addresses) == 0 ? 'checked' : ''; ?>>
+                                    <label class="form-check-label" for="new_is_default">
+                                        Set as default address
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Add Address</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Edit Address Modal -->
+    <div class="modal fade" id="editAddressModal" tabindex="-1" aria-labelledby="editAddressModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editAddressModalLabel">Edit Address</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form action="update_address.php" method="POST">
+                    <input type="hidden" id="edit_address_id" name="address_id">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label for="edit_address_line1" class="form-label">Address Line 1</label>
+                            <input type="text" class="form-control" id="edit_address_line1" name="address_line1" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="edit_address_line2" class="form-label">Address Line 2 <span class="text-muted">(Optional)</span></label>
+                            <input type="text" class="form-control" id="edit_address_line2" name="address_line2">
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="edit_city" class="form-label">City</label>
+                                <input type="text" class="form-control" id="edit_city" name="city" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="edit_state" class="form-label">State/Province</label>
+                                <input type="text" class="form-control" id="edit_state" name="state" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="edit_zip_code" class="form-label">ZIP/Postal Code</label>
+                                <input type="text" class="form-control" id="edit_zip_code" name="zip_code" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="edit_country" class="form-label">Country</label>
+                                <input type="text" class="form-control" id="edit_country" name="country">
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="edit_address_type" class="form-label">Address Type</label>
+                                <select class="form-select" id="edit_address_type" name="address_type">
+                                    <option value="home">Home</option>
+                                    <option value="work">Work</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="edit_is_default" name="is_default" value="1">
+                                    <label class="form-check-label" for="edit_is_default">
+                                        Set as default address
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">Update Address</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- JavaScript for address editing -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle edit address button clicks
+            const editButtons = document.querySelectorAll('.edit-address-btn');
+            editButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const id = this.getAttribute('data-id');
+                    const line1 = this.getAttribute('data-line1');
+                    const line2 = this.getAttribute('data-line2');
+                    const city = this.getAttribute('data-city');
+                    const state = this.getAttribute('data-state');
+                    const zip = this.getAttribute('data-zip');
+                    const country = this.getAttribute('data-country');
+                    const type = this.getAttribute('data-type');
+                    const isDefault = this.getAttribute('data-default') === '1';
+                    
+                    // Populate the edit form
+                    document.getElementById('edit_address_id').value = id;
+                    document.getElementById('edit_address_line1').value = line1;
+                    document.getElementById('edit_address_line2').value = line2 || '';
+                    document.getElementById('edit_city').value = city;
+                    document.getElementById('edit_state').value = state;
+                    document.getElementById('edit_zip_code').value = zip;
+                    document.getElementById('edit_country').value = country;
+                    document.getElementById('edit_address_type').value = type;
+                    document.getElementById('edit_is_default').checked = isDefault;
+                    
+                    // If address is already default, disable the checkbox
+                    if (isDefault) {
+                        document.getElementById('edit_is_default').disabled = true;
+                    } else {
+                        document.getElementById('edit_is_default').disabled = false;
+                    }
+                });
+            });
+        });
+    </script>
     
     <!-- Custom CSS for My Account page -->
     <style>
