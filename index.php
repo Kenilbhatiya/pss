@@ -49,7 +49,7 @@
                 include_once("includes/db_connection.php");
                 
                 // Get categories from database
-                $query = "SELECT * FROM categories LIMIT 4";
+                $query = "SELECT DISTINCT id, name, image_path, description FROM categories LIMIT 4";
                 $result = mysqli_query($conn, $query);
                 
                 if (!$result) {

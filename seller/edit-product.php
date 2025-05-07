@@ -50,7 +50,7 @@ if ($result && mysqli_num_rows($result) > 0) {
 }
 
 // Get categories for dropdown
-$categories_query = "SELECT * FROM categories ORDER BY name ASC";
+$categories_query = "SELECT DISTINCT id, name FROM categories ORDER BY name ASC";
 $categories_result = mysqli_query($conn, $categories_query);
 $categories = [];
 if ($categories_result) {

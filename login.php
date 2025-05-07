@@ -1,13 +1,24 @@
 <?php
-// Start session
-session_start();
+// Turn on error reporting 
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Start session with consistent settings
+session_start([
+    'cookie_lifetime' => 86400, // 1 day
+    'cookie_httponly' => true,
+    'cookie_path' => '/', 
+    'use_cookies' => 1,
+    'use_only_cookies' => 1
+]);
 
 // Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
     header("Location: index.php");
     exit();
 } elseif (isset($_SESSION['seller_id'])) {
-    header("Location: seller/add-product.php");
+    header("Location: seller/index.php");
     exit();
 } elseif (isset($_SESSION['admin_id'])) {
     header("Location: admin/index.php");
@@ -18,10 +29,16 @@ if (isset($_SESSION['user_id'])) {
 include_once("includes/db_connection.php");
 
 // Initialize variables
-$username = "";
-$password = "";
+$username = $password = "";
 $error = "";
 $success = "";
+
+// Check if the user is coming from another page
+if (isset($_SESSION['redirect_after_login']) && !empty($_SESSION['redirect_after_login'])) {
+    $redirect = $_SESSION['redirect_after_login'];
+} else {
+    $redirect = "index.php";
+}
 
 // Check if user just registered successfully
 if (isset($_SESSION['registration_success'])) {
@@ -30,15 +47,15 @@ if (isset($_SESSION['registration_success'])) {
 }
 
 // Process login form
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['login'])) {
     $username = trim($_POST['username']);
     $password = $_POST['password'];
     
     // Validation
     if (empty($username) || empty($password)) {
-        $error = "Username and password are required";
+        $error = "Both username and password are required";
     } else {
-        // Query for user
+        // Check user in database
         $query = "SELECT * FROM users WHERE username = ?";
         $stmt = mysqli_prepare($conn, $query);
         mysqli_stmt_bind_param($stmt, "s", $username);
@@ -48,38 +65,44 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (mysqli_num_rows($result) == 1) {
             $user = mysqli_fetch_assoc($result);
             
-            // Verify password (check both hashed password and direct comparison)
-            if (password_verify($password, $user['password']) || $password == $user['password']) {
+            // Verify password
+            if (password_verify($password, $user['password'])) {
+                // Clear redirect after login
+                $redirect_url = $redirect;
+                unset($_SESSION['redirect_after_login']);
+                
                 // Set session variables based on user type
-                if ($user['user_type'] == 'buyer') {
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $user['username'];
-                    
-                    // Redirect to homepage or to the page user came from
-                    $redirect = isset($_SESSION['redirect_after_login']) ? $_SESSION['redirect_after_login'] : 'index.php';
-                    unset($_SESSION['redirect_after_login']);
-                    header("Location: $redirect");
-                    exit();
-                } elseif ($user['user_type'] == 'seller') {
+                if ($user['user_type'] == 'seller') {
                     $_SESSION['seller_id'] = $user['id'];
                     $_SESSION['seller_username'] = $user['username'];
+                    $_SESSION['user_type'] = $user['user_type'];
                     
-                    // Redirect seller to add-product page
-                    header("Location: seller/add-product.php");
+                    // Redirect seller to seller dashboard
+                    header("Location: seller/index.php");
                     exit();
-                } elseif ($user['user_type'] == 'admin') {
+                } else if ($user['user_type'] == 'admin') {
                     $_SESSION['admin_id'] = $user['id'];
                     $_SESSION['admin_username'] = $user['username'];
+                    $_SESSION['user_type'] = $user['user_type'];
                     
                     // Redirect admin to admin dashboard
                     header("Location: admin/index.php");
                     exit();
+                } else {
+                    // Regular user/buyer
+                    $_SESSION['user_id'] = $user['id'];
+                    $_SESSION['username'] = $user['username'];
+                    $_SESSION['user_type'] = $user['user_type'];
+                    
+                    // Redirect buyer to main site
+                    header("Location: " . $redirect_url);
+                    exit();
                 }
             } else {
-                $error = "Invalid username or password";
+                $error = "Invalid password";
             }
         } else {
-            $error = "Invalid username or password";
+            $error = "Username does not exist";
         }
     }
 }
@@ -98,8 +121,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <?php include_once("includes/header.php"); ?>
-
     <section class="login-section py-5">
         <div class="container">
             <div class="row justify-content-center">
@@ -147,7 +168,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                     <a href="forgot_password.php" class="text-decoration-none">Forgot Password?</a>
                                 </div>
                                 <div class="d-grid gap-2">
-                                    <button type="submit" class="btn btn-success">Login</button>
+                                    <button type="submit" name="login" class="btn btn-success">Login</button>
                                 </div>
                             </form>
                             
@@ -160,8 +181,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             </div>
         </div>
     </section>
-
-    <?php include_once("includes/footer.php"); ?>
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>

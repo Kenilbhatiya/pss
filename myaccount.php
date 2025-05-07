@@ -1,9 +1,38 @@
 <?php
-// Start session
-session_start();
+// Turn on error reporting for debugging
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+
+// Handle direct login from fix_session.php
+if (isset($_POST['direct_login']) && $_POST['direct_login'] == 1) {
+    // Start session with the session ID from the form submission
+    if (isset($_POST['PHPSESSID'])) {
+        session_id($_POST['PHPSESSID']);
+    }
+}
+// Or from URL parameter
+else if (isset($_GET['PHPSESSID'])) {
+    session_id($_GET['PHPSESSID']);
+}
+
+// Start session with consistent settings
+session_start([
+    'cookie_lifetime' => 86400, // 1 day
+    'cookie_httponly' => true,
+    'cookie_path' => '/',
+    'use_cookies' => 1,
+    'use_only_cookies' => 1
+]);
 
 // Include database connection
 include_once("includes/db_connection.php");
+
+// Debug session info
+error_log("DEBUG - MyAccount Session: " . print_r($_SESSION, true));
+
+// Debug session
+// echo "<!-- MyAccount Session: " . print_r($_SESSION, true) . " -->";
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -16,6 +45,23 @@ if (!isset($_SESSION['user_id'])) {
 $user_id = $_SESSION['user_id'];
 $success_message = "";
 $error_message = "";
+
+// Ensure username is set in session
+if (!isset($_SESSION['username']) && isset($_SESSION['user_id'])) {
+    // Fetch username from database if not in session
+    $username_query = "SELECT username FROM users WHERE id = ?";
+    $username_stmt = mysqli_prepare($conn, $username_query);
+    if ($username_stmt) {
+        mysqli_stmt_bind_param($username_stmt, "i", $user_id);
+        mysqli_stmt_execute($username_stmt);
+        $username_result = mysqli_stmt_get_result($username_stmt);
+        
+        if ($username_result && mysqli_num_rows($username_result) > 0) {
+            $username_data = mysqli_fetch_assoc($username_result);
+            $_SESSION['username'] = $username_data['username'];
+        }
+    }
+}
 
 // Get user information
 $user = [];
@@ -128,63 +174,81 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['change_password'])) {
 
 // Get user orders
 $orders = [];
-$orders_query = "SELECT o.*, COUNT(oi.id) as item_count 
-                FROM orders o 
-                LEFT JOIN order_items oi ON o.id = oi.order_id 
-                WHERE o.user_id = ? 
-                GROUP BY o.id 
-                ORDER BY o.created_at DESC";
-$orders_stmt = mysqli_prepare($conn, $orders_query);
-if ($orders_stmt) {
-    mysqli_stmt_bind_param($orders_stmt, "i", $user_id);
-    mysqli_stmt_execute($orders_stmt);
-    $orders_result = mysqli_stmt_get_result($orders_stmt);
-    
-    if ($orders_result) {
-        while ($row = mysqli_fetch_assoc($orders_result)) {
-            // Set delivery date to 2 days after created_at if it's not set
-            if (empty($row['delivery_date'])) {
-                $created_date = new DateTime($row['created_at']);
-                $delivery_date = $created_date->modify('+2 days');
-                $row['delivery_date'] = $delivery_date->format('Y-m-d');
+// Check if orders table exists
+$orders_table_query = "SHOW TABLES LIKE 'orders'";
+$orders_table_result = mysqli_query($conn, $orders_table_query);
+
+if (mysqli_num_rows($orders_table_result) > 0) {
+    $orders_query = "SELECT o.*, COUNT(oi.id) as item_count 
+                    FROM orders o 
+                    LEFT JOIN order_items oi ON o.id = oi.order_id 
+                    WHERE o.user_id = ? 
+                    GROUP BY o.id 
+                    ORDER BY o.created_at DESC";
+    $orders_stmt = mysqli_prepare($conn, $orders_query);
+    if ($orders_stmt) {
+        mysqli_stmt_bind_param($orders_stmt, "i", $user_id);
+        mysqli_stmt_execute($orders_stmt);
+        $orders_result = mysqli_stmt_get_result($orders_stmt);
+        
+        if ($orders_result) {
+            while ($row = mysqli_fetch_assoc($orders_result)) {
+                // Set delivery date to 2 days after created_at if it's not set
+                if (empty($row['delivery_date'])) {
+                    $created_date = new DateTime($row['created_at']);
+                    $delivery_date = $created_date->modify('+2 days');
+                    $row['delivery_date'] = $delivery_date->format('Y-m-d');
+                }
+                $orders[] = $row;
             }
-            $orders[] = $row;
         }
     }
 }
 
 // Get user wishlist items
 $wishlist_items = [];
-$wishlist_query = "SELECT w.id as wishlist_id, p.* 
-                  FROM wishlist w 
-                  JOIN products p ON w.product_id = p.id 
-                  WHERE w.user_id = ? 
-                  ORDER BY w.created_at DESC";
-$wishlist_stmt = mysqli_prepare($conn, $wishlist_query);
-if ($wishlist_stmt) {
-    mysqli_stmt_bind_param($wishlist_stmt, "i", $user_id);
-    mysqli_stmt_execute($wishlist_stmt);
-    $wishlist_result = mysqli_stmt_get_result($wishlist_stmt);
-    
-    if ($wishlist_result) {
-        while ($row = mysqli_fetch_assoc($wishlist_result)) {
-            $wishlist_items[] = $row;
+// Check if wishlist table exists
+$wishlist_table_query = "SHOW TABLES LIKE 'wishlist'";
+$wishlist_table_result = mysqli_query($conn, $wishlist_table_query);
+
+if (mysqli_num_rows($wishlist_table_result) > 0) {
+    $wishlist_query = "SELECT w.id as wishlist_id, p.* 
+                    FROM wishlist w 
+                    JOIN products p ON w.product_id = p.id 
+                    WHERE w.user_id = ? 
+                    ORDER BY w.created_at DESC";
+    $wishlist_stmt = mysqli_prepare($conn, $wishlist_query);
+    if ($wishlist_stmt) {
+        mysqli_stmt_bind_param($wishlist_stmt, "i", $user_id);
+        mysqli_stmt_execute($wishlist_stmt);
+        $wishlist_result = mysqli_stmt_get_result($wishlist_stmt);
+        
+        if ($wishlist_result) {
+            while ($row = mysqli_fetch_assoc($wishlist_result)) {
+                $wishlist_items[] = $row;
+            }
         }
     }
 }
 
 // Get user addresses
 $addresses = [];
-$addresses_query = "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC";
-$addresses_stmt = mysqli_prepare($conn, $addresses_query);
-if ($addresses_stmt) {
-    mysqli_stmt_bind_param($addresses_stmt, "i", $user_id);
-    mysqli_stmt_execute($addresses_stmt);
-    $addresses_result = mysqli_stmt_get_result($addresses_stmt);
-    
-    if ($addresses_result) {
-        while ($row = mysqli_fetch_assoc($addresses_result)) {
-            $addresses[] = $row;
+// Check if user_addresses table exists
+$addresses_table_query = "SHOW TABLES LIKE 'user_addresses'";
+$addresses_table_result = mysqli_query($conn, $addresses_table_query);
+
+if (mysqli_num_rows($addresses_table_result) > 0) {
+    $addresses_query = "SELECT * FROM user_addresses WHERE user_id = ? ORDER BY is_default DESC, created_at DESC";
+    $addresses_stmt = mysqli_prepare($conn, $addresses_query);
+    if ($addresses_stmt) {
+        mysqli_stmt_bind_param($addresses_stmt, "i", $user_id);
+        mysqli_stmt_execute($addresses_stmt);
+        $addresses_result = mysqli_stmt_get_result($addresses_stmt);
+        
+        if ($addresses_result) {
+            while ($row = mysqli_fetch_assoc($addresses_result)) {
+                $addresses[] = $row;
+            }
         }
     }
 }

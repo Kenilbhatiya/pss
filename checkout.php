@@ -154,21 +154,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['place_order'])) {
             
             // Insert order
             $delivery_date = date('Y-m-d', strtotime('+2 days'));
-            $username = $user_data['username'];
             
-            // Get the first product name (or combine if multiple)
-            $product_name = '';
-            if (count($cart_items) == 1) {
-                $product_name = $cart_items[0]['name'];
-            } else {
-                $product_name = $cart_items[0]['name'] . ' and ' . (count($cart_items) - 1) . ' more';
-            }
-            
-            $order_query = "INSERT INTO orders (user_id, username, product_name, total_amount, shipping_address, billing_address, payment_method, status, delivery_date) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)";
+            $order_query = "INSERT INTO orders (user_id, total_amount, shipping_address, billing_address, payment_method, status) 
+                          VALUES (?, ?, ?, ?, ?, 'pending')";
             $order_stmt = mysqli_prepare($conn, $order_query);
-            mysqli_stmt_bind_param($order_stmt, "issdssss", $user_id, $username, $product_name, $total_with_tax_shipping, 
-                                 $shipping_address, $billing_address, $payment_method, $delivery_date);
+            mysqli_stmt_bind_param($order_stmt, "idsss", $user_id, $total_with_tax_shipping, 
+                                 $shipping_address, $billing_address, $payment_method);
             
             if (!mysqli_stmt_execute($order_stmt)) {
                 throw new Exception("Failed to create order: " . mysqli_error($conn));

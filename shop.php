@@ -51,7 +51,7 @@ if ($result) {
 }
 
 // Get categories for filter
-$categories_query = "SELECT * FROM categories ORDER BY name ASC";
+$categories_query = "SELECT DISTINCT id, name FROM categories ORDER BY name ASC";
 $categories_result = mysqli_query($conn, $categories_query);
 $categories = [];
 if ($categories_result) {
@@ -192,5 +192,16 @@ if ($categories_result) {
 
     <!-- Bootstrap JS Bundle with Popper -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Initialize Bootstrap Dropdowns -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enable all dropdowns
+            var dropdownElementList = [].slice.call(document.querySelectorAll('.dropdown-toggle'));
+            dropdownElementList.map(function(dropdownToggleEl) {
+                return new bootstrap.Dropdown(dropdownToggleEl);
+            });
+        });
+    </script>
 </body>
 </html> 

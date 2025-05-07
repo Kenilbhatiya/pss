@@ -23,7 +23,7 @@ $status = "in_stock";
 $errors = [];
 
 // Get categories for dropdown
-$categories_query = "SELECT * FROM categories ORDER BY name ASC";
+$categories_query = "SELECT DISTINCT id, name FROM categories ORDER BY name ASC";
 $categories_result = mysqli_query($conn, $categories_query);
 $categories = [];
 if ($categories_result) {
@@ -66,13 +66,25 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     // Process image upload
-    $target_dir = "../images/products/";
+    $target_dir = "../images/";
     $image_path = "";
     $upload_error = false;
     
     // Check if directory exists, create if not
     if (!file_exists($target_dir)) {
-        mkdir($target_dir, 0755, true);
+        if (!mkdir($target_dir, 0777, true)) {
+            $errors[] = "Failed to create image directory";
+            $upload_error = true;
+        }
+    }
+
+    // Check if directory is writable
+    if (!is_writable($target_dir)) {
+        chmod($target_dir, 0777);
+        if (!is_writable($target_dir)) {
+            $errors[] = "Image directory is not writable";
+            $upload_error = true;
+        }
     }
     
     if (isset($_FILES["product_image"]) && $_FILES["product_image"]["error"] == 0) {
@@ -84,28 +96,98 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             // Generate unique filename
             $new_filename = uniqid() . "." . $file_extension;
             $target_file = $target_dir . $new_filename;
-            $relative_path = "images/products/" . $new_filename;
+            $relative_path = "images/" . $new_filename;
             
             // Try to move uploaded file
             if (move_uploaded_file($_FILES["product_image"]["tmp_name"], $target_file)) {
+                // Set proper permissions to the uploaded file
+                chmod($target_file, 0777);
                 $image_path = $relative_path;
             } else {
-                $errors[] = "Failed to upload image";
+                // Detailed error message for debugging
+                $upload_error_code = $_FILES["product_image"]["error"];
+                $error_message = "Failed to upload image. ";
+                
+                switch ($upload_error_code) {
+                    case UPLOAD_ERR_INI_SIZE:
+                        $error_message .= "The uploaded file exceeds the upload_max_filesize directive in php.ini.";
+                        break;
+                    case UPLOAD_ERR_FORM_SIZE:
+                        $error_message .= "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.";
+                        break;
+                    case UPLOAD_ERR_PARTIAL:
+                        $error_message .= "The uploaded file was only partially uploaded.";
+                        break;
+                    case UPLOAD_ERR_NO_FILE:
+                        $error_message .= "No file was uploaded.";
+                        break;
+                    case UPLOAD_ERR_NO_TMP_DIR:
+                        $error_message .= "Missing a temporary folder.";
+                        break;
+                    case UPLOAD_ERR_CANT_WRITE:
+                        $error_message .= "Failed to write file to disk.";
+                        break;
+                    case UPLOAD_ERR_EXTENSION:
+                        $error_message .= "A PHP extension stopped the file upload.";
+                        break;
+                    default:
+                        $error_message .= "Permissions issue or unknown error.";
+                        break;
+                }
+                
+                $errors[] = $error_message;
                 $upload_error = true;
             }
         } else {
             $errors[] = "Only JPG, JPEG, PNG & WEBP files are allowed";
             $upload_error = true;
         }
+    } else if (isset($_FILES["product_image"]) && $_FILES["product_image"]["error"] != 4) {
+        // Error code 4 is "no file uploaded" which is fine, but any other error should be reported
+        $upload_error_code = $_FILES["product_image"]["error"];
+        $error_message = "Image upload error (code $upload_error_code): ";
+        
+        switch ($upload_error_code) {
+            case UPLOAD_ERR_INI_SIZE:
+                $error_message .= "The uploaded file exceeds the upload_max_filesize directive in php.ini.";
+                break;
+            case UPLOAD_ERR_FORM_SIZE:
+                $error_message .= "The uploaded file exceeds the MAX_FILE_SIZE directive that was specified in the HTML form.";
+                break;
+            case UPLOAD_ERR_PARTIAL:
+                $error_message .= "The uploaded file was only partially uploaded.";
+                break;
+            case UPLOAD_ERR_NO_TMP_DIR:
+                $error_message .= "Missing a temporary folder.";
+                break;
+            case UPLOAD_ERR_CANT_WRITE:
+                $error_message .= "Failed to write file to disk.";
+                break;
+            case UPLOAD_ERR_EXTENSION:
+                $error_message .= "A PHP extension stopped the file upload.";
+                break;
+            default:
+                $error_message .= "Unknown error.";
+                break;
+        }
+        
+        $errors[] = $error_message;
+        $upload_error = true;
     } else {
-        // No image uploaded, use default
-        $image_path = "images/products/default-plant.jpg";
+        // No image uploaded or no file selected, use default
+        $default_image = "../images/snake.jpg";
+        if (file_exists($default_image)) {
+            $image_path = "images/snake.jpg";
+        } else {
+            $errors[] = "Default image not found. Please upload an image.";
+            $upload_error = true;
+        }
     }
     
     // If no errors, proceed with database insertion
     if (empty($errors)) {
-        $query = "INSERT INTO products (name, description, price, sale_price, stock_quantity, image_path, category_id, featured, status) 
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $query = "INSERT INTO products (name, description, price, sale_price, stock_quantity, image_path, category_id, featured, status, seller_id) 
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         
         $stmt = mysqli_prepare($conn, $query);
         
@@ -113,7 +195,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $sale_price = empty($sale_price) ? null : $sale_price;
         $category_id = ($category_id === 0) ? null : $category_id;
         
-        mysqli_stmt_bind_param($stmt, "ssddisiss", $name, $description, $price, $sale_price, $quantity, $image_path, $category_id, $featured, $status);
+        // Get seller ID from session
+        $seller_id = isset($_SESSION['seller_id']) ? $_SESSION['seller_id'] : null;
+        
+        mysqli_stmt_bind_param($stmt, "ssddisissi", $name, $description, $price, $sale_price, $quantity, $image_path, $category_id, $featured, $status, $seller_id);
         
         if (mysqli_stmt_execute($stmt)) {
             $product_id = mysqli_insert_id($conn);
@@ -124,7 +209,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $errors[] = "Database error: " . mysqli_error($conn);
             
             // If database insertion fails, delete the uploaded image
-            if (!empty($image_path) && $image_path !== "images/products/default-plant.jpg" && file_exists("../" . $image_path)) {
+            if (!empty($image_path) && $image_path !== "images/snake.jpg" && file_exists("../" . $image_path)) {
                 unlink("../" . $image_path);
             }
         }
@@ -237,7 +322,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                         <div class="form-text">Recommended size: 800x800 pixels. Max 2MB.</div>
                                         <div class="mt-3">
                                             <div class="image-preview border rounded p-2 text-center" id="imagePreview">
-                                                <img src="../images/products/default-plant.jpg" class="img-fluid" id="preview-image" alt="Product Image Preview" style="max-height: 200px;">
+                                                <img src="../images/snake.jpg" class="img-fluid" id="preview-image" alt="Product Image Preview" style="max-height: 200px;">
                                             </div>
                                         </div>
                                     </div>
@@ -293,7 +378,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                     reader.readAsDataURL(file);
                 } else {
-                    previewImage.src = '../images/products/default-plant.jpg';
+                    previewImage.src = '../images/snake.jpg';
                 }
             });
         });
