@@ -2,14 +2,17 @@
 // Start session
 session_start();
 
-// Check if user is logged in as admin
-if(!isset($_SESSION['admin_id'])) {
+// Check if user is logged in as seller
+if(!isset($_SESSION['seller_id'])) {
     header("Location: login.php");
     exit();
 }
 
 // Include database connection
 include_once("../includes/db_connection.php");
+
+// Get seller ID from session
+$seller_id = $_SESSION['seller_id'];
 
 // Handle category operations (add, edit, delete)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -37,8 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                $stmt = $conn->prepare("INSERT INTO categories (name, description, image) VALUES (?, ?, ?)");
-                $stmt->bind_param("sss", $name, $description, $image_path);
+                $stmt = $conn->prepare("INSERT INTO categories (name, description, image, seller_id) VALUES (?, ?, ?, ?)");
+                $stmt->bind_param("sssi", $name, $description, $image_path, $seller_id);
                 $stmt->execute();
                 break;
             
@@ -69,15 +72,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     }
                 }
                 
-                $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ?, image = ? WHERE id = ?");
-                $stmt->bind_param("sssi", $name, $description, $image_path, $id);
+                $stmt = $conn->prepare("UPDATE categories SET name = ?, description = ?, image = ? WHERE id = ? AND seller_id = ?");
+                $stmt->bind_param("sssii", $name, $description, $image_path, $id, $seller_id);
                 $stmt->execute();
                 break;
             
             case 'delete':
                 $id = $_POST['id'];
-                $stmt = $conn->prepare("DELETE FROM categories WHERE id = ?");
-                $stmt->bind_param("i", $id);
+                $stmt = $conn->prepare("DELETE FROM categories WHERE id = ? AND seller_id = ?");
+                $stmt->bind_param("ii", $id, $seller_id);
                 $stmt->execute();
                 break;
         }
@@ -91,8 +94,18 @@ if($result->num_rows == 0) {
     $conn->query("ALTER TABLE categories ADD COLUMN image VARCHAR(255) DEFAULT NULL");
 }
 
-// Fetch all categories
-$result = $conn->query("SELECT * FROM categories ORDER BY name");
+// Check if category table has seller_id column
+$result = $conn->query("SHOW COLUMNS FROM categories LIKE 'seller_id'");
+if($result->num_rows == 0) {
+    // Add seller_id column if it doesn't exist
+    $conn->query("ALTER TABLE categories ADD COLUMN seller_id INT DEFAULT NULL");
+}
+
+// Fetch all categories for this seller
+$stmt = $conn->prepare("SELECT * FROM categories WHERE seller_id = ? ORDER BY name");
+$stmt->bind_param("i", $seller_id);
+$stmt->execute();
+$result = $stmt->get_result();
 $categories = $result->fetch_all(MYSQLI_ASSOC);
 ?>
 
@@ -106,7 +119,7 @@ $categories = $result->fetch_all(MYSQLI_ASSOC);
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="container-fluid">

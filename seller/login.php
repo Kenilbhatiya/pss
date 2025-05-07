@@ -4,10 +4,10 @@ session_start();
 
 // Redirect if already logged in
 if(isset($_SESSION['seller_id'])) {
-    header("Location: add-product.php");
+    header("Location: index.php");
     exit();
 } elseif(isset($_SESSION['admin_id'])) {
-    header("Location: index.php");
+    header("Location: ../admin/index.php");
     exit();
 }
 
@@ -38,22 +38,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (mysqli_num_rows($result) == 1) {
             $user = mysqli_fetch_assoc($result);
             
-            // Verify password
-            if (password_verify($password, $user['password'])) {
+            // Check if password matches (using either hashed or direct comparison)
+            if (password_verify($password, $user['password']) || $password == $user['password']) {
                 // Set session variables based on user type
                 if ($user['user_type'] == 'seller') {
                     $_SESSION['seller_id'] = $user['id'];
                     $_SESSION['seller_username'] = $user['username'];
                     
-                    // Redirect seller to add product page
-                    header("Location: add-product.php");
+                    // Redirect seller to dashboard
+                    header("Location: index.php");
                     exit();
                 } elseif ($user['user_type'] == 'admin') {
                     $_SESSION['admin_id'] = $user['id'];
                     $_SESSION['admin_username'] = $user['username'];
                     
-                    // Redirect admin to dashboard
-                    header("Location: index.php");
+                    // Redirect admin to admin dashboard
+                    header("Location: ../admin/index.php");
                     exit();
                 } elseif ($user['user_type'] == 'buyer') {
                     $_SESSION['user_id'] = $user['id'];
@@ -91,8 +91,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="card-body">
                 <div class="text-center mb-4">
                     <i class="fas fa-leaf text-success fa-3x mb-3"></i>
-                    <h3>Plant Nursery Seller</h3>
-                    <p class="text-muted">Enter your credentials to access the seller panel</p>
+                    <h3>Plant Nursery Login</h3>
+                    <p class="text-muted">Enter your credentials to access your account</p>
                 </div>
                 
                 <?php if(!empty($error)): ?>

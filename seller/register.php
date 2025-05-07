@@ -19,6 +19,9 @@ $last_name = "";
 $password = "";
 $confirm_password = "";
 $admin_code = "";
+$store_name = "";
+$address = "";
+$phone = "";
 $errors = [];
 $success = "";
 
@@ -32,6 +35,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     $admin_code = trim($_POST['admin_code']);
+    $store_name = trim($_POST['store_name']);
+    $address = trim($_POST['address']);
+    $phone = trim($_POST['phone']);
     
     // Validate admin code
     if ($admin_code !== $register_code) {
@@ -85,6 +91,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "Last name is required";
     }
     
+    // Validate store name
+    if (empty($store_name)) {
+        $errors[] = "Store name is required";
+    }
+    
     // Validate password
     if (empty($password)) {
         $errors[] = "Password is required";
@@ -104,23 +115,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Hash the password
         $hashed_password = password_hash($password, PASSWORD_DEFAULT);
         
-        // Set admin value to 1
-        $admin = 1;
-        
-        // Insert the new admin into the database
-        $query = "INSERT INTO users (username, email, password, first_name, last_name, admin, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())";
+        // Insert the new seller into the users table
+        $query = "INSERT INTO users (username, email, password, first_name, last_name, user_type, status, created_at) 
+                 VALUES (?, ?, ?, ?, ?, 'seller', 1, NOW())";
         $stmt = mysqli_prepare($conn, $query);
-        mysqli_stmt_bind_param($stmt, "sssssi", $username, $email, $hashed_password, $first_name, $last_name, $admin);
+        mysqli_stmt_bind_param($stmt, "sssss", $username, $email, $hashed_password, $first_name, $last_name);
         
         if (mysqli_stmt_execute($stmt)) {
-            $success = "Admin account created successfully. You can now login.";
+            $user_id = mysqli_insert_id($conn);
             
-            // Clear form fields after successful registration
-            $username = "";
-            $email = "";
-            $first_name = "";
-            $last_name = "";
-            $admin_code = "";
+            // Insert into sellers table
+            $seller_query = "INSERT INTO sellers (user_id, username, password, email, store_name, phone, address, status) 
+                           VALUES (?, ?, ?, ?, ?, ?, ?, 1)";
+            $seller_stmt = mysqli_prepare($conn, $seller_query);
+            mysqli_stmt_bind_param($seller_stmt, "issssss", $user_id, $username, $hashed_password, $email, $store_name, $phone, $address);
+            
+            if (!mysqli_stmt_execute($seller_stmt)) {
+                $errors[] = "Error creating seller record: " . mysqli_error($conn);
+            } else {
+                $success = "Seller account created successfully. You can now login.";
+                
+                // Clear form fields after successful registration
+                $username = "";
+                $email = "";
+                $first_name = "";
+                $last_name = "";
+                $admin_code = "";
+                $store_name = "";
+                $address = "";
+                $phone = "";
+            }
         } else {
             $errors[] = "Database error: " . mysqli_error($conn);
         }
@@ -133,7 +157,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Registration - Plant Nursery</title>
+    <title>Seller Registration - Plant Nursery</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -166,8 +190,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <div class="card-body">
                 <div class="text-center mb-4">
                     <i class="fas fa-leaf text-success fa-3x mb-3"></i>
-                    <h3>Plant Nursery Admin Registration</h3>
-                    <p class="text-muted">Create a new admin account</p>
+                    <h3>Plant Nursery Seller Registration</h3>
+                    <p class="text-muted">Create a new seller account</p>
                 </div>
                 
                 <?php if(!empty($errors)): ?>
@@ -223,6 +247,30 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="mb-3">
+                        <label for="store_name" class="form-label">Store Name *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-store"></i></span>
+                            <input type="text" class="form-control" id="store_name" name="store_name" value="<?php echo htmlspecialchars($store_name); ?>" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone Number</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-phone"></i></span>
+                            <input type="text" class="form-control" id="phone" name="phone" value="<?php echo htmlspecialchars($phone); ?>">
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="address" class="form-label">Store Address *</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="fas fa-map-marker-alt"></i></span>
+                            <textarea class="form-control" id="address" name="address" rows="3" required><?php echo htmlspecialchars($address); ?></textarea>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
                         <label for="password" class="form-label">Password *</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-lock"></i></span>
@@ -242,16 +290,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </div>
                     
                     <div class="mb-4">
-                        <label for="admin_code" class="form-label">Admin Registration Code *</label>
+                        <label for="admin_code" class="form-label">Seller Registration Code *</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="fas fa-key"></i></span>
                             <input type="text" class="form-control" id="admin_code" name="admin_code" value="<?php echo htmlspecialchars($admin_code); ?>" required>
                         </div>
-                        <div class="form-text">Enter the special code provided to create admin accounts</div>
+                        <div class="form-text">Enter the special code provided to create seller accounts</div>
                     </div>
                     
                     <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success">Register Admin Account</button>
+                        <button type="submit" class="btn btn-success">Register Seller Account</button>
                     </div>
                 </form>
                 

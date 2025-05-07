@@ -142,6 +142,12 @@ if ($orders_stmt) {
     
     if ($orders_result) {
         while ($row = mysqli_fetch_assoc($orders_result)) {
+            // Set delivery date to 2 days after created_at if it's not set
+            if (empty($row['delivery_date'])) {
+                $created_date = new DateTime($row['created_at']);
+                $delivery_date = $created_date->modify('+2 days');
+                $row['delivery_date'] = $delivery_date->format('Y-m-d');
+            }
             $orders[] = $row;
         }
     }
@@ -334,6 +340,7 @@ if ($addresses_stmt) {
                                                     <tr>
                                                         <th>Order #</th>
                                                         <th>Date</th>
+                                                        <th>Delivery Date</th>
                                                         <th>Items</th>
                                                         <th>Total</th>
                                                         <th>Status</th>
@@ -345,6 +352,7 @@ if ($addresses_stmt) {
                                                         <tr>
                                                             <td>#<?php echo $order['id']; ?></td>
                                                             <td><?php echo date('M d, Y', strtotime($order['created_at'])); ?></td>
+                                                            <td><?php echo date('M d, Y', strtotime($order['delivery_date'])); ?></td>
                                                             <td><?php echo $order['item_count']; ?></td>
                                                             <td>₹<?php echo number_format($order['total_amount'], 2); ?></td>
                                                             <td>
@@ -396,6 +404,7 @@ if ($addresses_stmt) {
                                                     <tr>
                                                         <th>Order #</th>
                                                         <th>Date</th>
+                                                        <th>Delivery Date</th>
                                                         <th>Items</th>
                                                         <th>Total</th>
                                                         <th>Status</th>
@@ -407,6 +416,7 @@ if ($addresses_stmt) {
                                                         <tr>
                                                             <td>#<?php echo $order['id']; ?></td>
                                                             <td><?php echo date('M d, Y', strtotime($order['created_at'])); ?></td>
+                                                            <td><?php echo date('M d, Y', strtotime($order['delivery_date'])); ?></td>
                                                             <td><?php echo $order['item_count']; ?></td>
                                                             <td>₹<?php echo number_format($order['total_amount'], 2); ?></td>
                                                             <td>

@@ -11,61 +11,96 @@ if(!isset($_SESSION['seller_id'])) {
 // Include database connection
 include_once("../includes/db_connection.php");
 
-// Get counts for dashboard
-$productCount = 0;
-$categoryCount = 0;
-$orderCount = 0;
-$userCount = 0;
+// Get seller ID from session
+$seller_id = $_SESSION['seller_id'];
 
-// Count products
-$query = "SELECT COUNT(*) as count FROM products";
-$result = mysqli_query($conn, $query);
-if($result) {
-    $row = mysqli_fetch_assoc($result);
+// Check if updating DB structure
+if(isset($_GET['fix_db']) && $_GET['fix_db'] == 'yes') {
+    // Try to add seller_id column if it doesn't exist
+    $check_column = "SHOW COLUMNS FROM products LIKE 'seller_id'";
+    $column_exists = mysqli_query($conn, $check_column);
+    
+    if (mysqli_num_rows($column_exists) == 0) {
+        // Column doesn't exist, add it
+        $add_column = "ALTER TABLE products ADD COLUMN seller_id INT DEFAULT NULL";
+        mysqli_query($conn, $add_column);
+        
+        // Update the product with the current seller ID
+        $update_product = "UPDATE products SET seller_id = $seller_id";
+        mysqli_query($conn, $update_product);
+    }
+    
+    // Redirect back to dashboard
+    header("Location: index.php");
+    exit();
+}
+
+// Get counts for current seller
+// Get product count for this seller
+$productCountQuery = "SELECT COUNT(*) as count FROM products WHERE seller_id = ?";
+$stmt = mysqli_prepare($conn, $productCountQuery);
+mysqli_stmt_bind_param($stmt, "i", $seller_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$productCount = 0;
+if($result && $row = mysqli_fetch_assoc($result)) {
     $productCount = $row['count'];
 }
 
-// Count categories
-$query = "SELECT COUNT(*) as count FROM categories";
-$result = mysqli_query($conn, $query);
-if($result) {
-    $row = mysqli_fetch_assoc($result);
+// Get category count for this seller's products
+$categoryCountQuery = "SELECT COUNT(DISTINCT category_id) as count FROM products WHERE seller_id = ?";
+$stmt = mysqli_prepare($conn, $categoryCountQuery);
+mysqli_stmt_bind_param($stmt, "i", $seller_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$categoryCount = 0;
+if($result && $row = mysqli_fetch_assoc($result)) {
     $categoryCount = $row['count'];
 }
 
-// Count orders
-$query = "SELECT COUNT(*) as count FROM orders";
-$result = mysqli_query($conn, $query);
-if($result) {
-    $row = mysqli_fetch_assoc($result);
+// Get order count for this seller
+$orderCountQuery = "SELECT COUNT(DISTINCT o.id) as count 
+                   FROM orders o 
+                   JOIN order_items oi ON o.id = oi.order_id 
+                   JOIN products p ON oi.product_id = p.id 
+                   WHERE p.seller_id = ?";
+$stmt = mysqli_prepare($conn, $orderCountQuery);
+mysqli_stmt_bind_param($stmt, "i", $seller_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
+$orderCount = 0;
+if($result && $row = mysqli_fetch_assoc($result)) {
     $orderCount = $row['count'];
 }
 
-// Count users
-$query = "SELECT COUNT(*) as count FROM users";
-$result = mysqli_query($conn, $query);
-if($result) {
-    $row = mysqli_fetch_assoc($result);
-    $userCount = $row['count'];
-}
-
-// Get recent orders
+// Get recent orders for this seller
 $recentOrders = [];
-$query = "SELECT o.id, o.total_amount, o.created_at, o.status, u.username 
+$query = "SELECT DISTINCT o.id, o.total_amount, o.created_at, o.status, u.username 
           FROM orders o 
           JOIN users u ON o.user_id = u.id 
+          JOIN order_items oi ON o.id = oi.order_id
+          JOIN products p ON oi.product_id = p.id
+          WHERE p.seller_id = ?
           ORDER BY o.created_at DESC LIMIT 5";
-$result = mysqli_query($conn, $query);
+$stmt = mysqli_prepare($conn, $query);
+mysqli_stmt_bind_param($stmt, "i", $seller_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
 if($result) {
     while($row = mysqli_fetch_assoc($result)) {
         $recentOrders[] = $row;
     }
 }
 
-// Get low stock products
+// Get low stock products for this seller
 $lowStockProducts = [];
-$query = "SELECT id, name, stock_quantity as quantity, image_path FROM products WHERE stock_quantity < 10 ORDER BY stock_quantity ASC LIMIT 5";
-$result = mysqli_query($conn, $query);
+$query = "SELECT id, name, stock_quantity as quantity, image_path FROM products 
+          WHERE seller_id = ? AND stock_quantity <= reorder_level
+          ORDER BY stock_quantity ASC LIMIT 5";
+$stmt = mysqli_prepare($conn, $query);
+mysqli_stmt_bind_param($stmt, "i", $seller_id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
 if($result) {
     while($row = mysqli_fetch_assoc($result)) {
         $lowStockProducts[] = $row;
@@ -149,21 +184,6 @@ if($result) {
                             </div>
                             <div class="card-footer d-flex align-items-center justify-content-between">
                                 <a href="orders.php" class="text-white text-decoration-none">View Details</a>
-                                <i class="fas fa-arrow-right text-white"></i>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <div class="card text-white bg-danger h-100">
-                            <div class="card-body d-flex align-items-center">
-                                <i class="fas fa-users fa-3x me-3"></i>
-                                <div>
-                                    <h5 class="card-title">Users</h5>
-                                    <h2 class="mb-0"><?php echo $userCount; ?></h2>
-                                </div>
-                            </div>
-                            <div class="card-footer d-flex align-items-center justify-content-between">
-                                <a href="users.php" class="text-white text-decoration-none">View Details</a>
                                 <i class="fas fa-arrow-right text-white"></i>
                             </div>
                         </div>

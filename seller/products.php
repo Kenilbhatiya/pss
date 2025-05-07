@@ -2,8 +2,8 @@
 // Start session
 session_start();
 
-// Check if user is logged in as admin
-if(!isset($_SESSION['admin_id'])) {
+// Check if user is logged in as seller
+if(!isset($_SESSION['seller_id'])) {
     header("Location: login.php");
     exit();
 }
@@ -11,14 +11,17 @@ if(!isset($_SESSION['admin_id'])) {
 // Include database connection
 include_once("../includes/db_connection.php");
 
+// Get seller ID
+$seller_id = $_SESSION['seller_id'];
+
 // Delete product if requested
 if(isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $product_id = intval($_GET['delete']);
     
-    // Check if product exists
-    $check_query = "SELECT image_path FROM products WHERE id = ?";
+    // Check if product exists and belongs to the current seller
+    $check_query = "SELECT image_path FROM products WHERE id = ? AND seller_id = ?";
     $check_stmt = mysqli_prepare($conn, $check_query);
-    mysqli_stmt_bind_param($check_stmt, "i", $product_id);
+    mysqli_stmt_bind_param($check_stmt, "ii", $product_id, $seller_id);
     mysqli_stmt_execute($check_stmt);
     mysqli_stmt_store_result($check_stmt);
     
@@ -28,9 +31,9 @@ if(isset($_GET['delete']) && is_numeric($_GET['delete'])) {
         mysqli_stmt_fetch($check_stmt);
         
         // Delete from database
-        $delete_query = "DELETE FROM products WHERE id = ?";
+        $delete_query = "DELETE FROM products WHERE id = ? AND seller_id = ?";
         $delete_stmt = mysqli_prepare($conn, $delete_query);
-        mysqli_stmt_bind_param($delete_stmt, "i", $product_id);
+        mysqli_stmt_bind_param($delete_stmt, "ii", $product_id, $seller_id);
         
         if(mysqli_stmt_execute($delete_stmt)) {
             // Delete product image if it exists and is not a default image
@@ -43,7 +46,7 @@ if(isset($_GET['delete']) && is_numeric($_GET['delete'])) {
             $_SESSION['error_message'] = "Failed to delete product.";
         }
     } else {
-        $_SESSION['error_message'] = "Product not found.";
+        $_SESSION['error_message'] = "Product not found or you don't have permission to delete it.";
     }
     
     // Redirect to prevent resubmission
@@ -55,27 +58,43 @@ if(isset($_GET['delete']) && is_numeric($_GET['delete'])) {
 $category_filter = isset($_GET['category']) ? intval($_GET['category']) : 0;
 $search = isset($_GET['search']) ? $_GET['search'] : '';
 
-// Prepare query
+// Prepare query with seller_id filter
 $query = "SELECT p.*, c.name as category_name 
           FROM products p
           LEFT JOIN categories c ON p.category_id = c.id
-          WHERE 1=1";
+          WHERE p.seller_id = ?";
 
 // Add category filter
 if ($category_filter > 0) {
-    $query .= " AND p.category_id = $category_filter";
+    $query .= " AND p.category_id = ?";
 }
 
 // Add search filter
 if (!empty($search)) {
-    $search = mysqli_real_escape_string($conn, $search);
-    $query .= " AND (p.name LIKE '%$search%' OR p.description LIKE '%$search%')";
+    $query .= " AND (p.name LIKE ? OR p.description LIKE ?)";
 }
 
 $query .= " ORDER BY p.id DESC";
 
+// Prepare statement
+$stmt = mysqli_prepare($conn, $query);
+
+// Bind parameters
+if ($category_filter > 0 && !empty($search)) {
+    $search_param = "%$search%";
+    mysqli_stmt_bind_param($stmt, "iiss", $seller_id, $category_filter, $search_param, $search_param);
+} elseif ($category_filter > 0) {
+    mysqli_stmt_bind_param($stmt, "ii", $seller_id, $category_filter);
+} elseif (!empty($search)) {
+    $search_param = "%$search%";
+    mysqli_stmt_bind_param($stmt, "iss", $seller_id, $search_param, $search_param);
+} else {
+    mysqli_stmt_bind_param($stmt, "i", $seller_id);
+}
+
 // Execute query
-$result = mysqli_query($conn, $query);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
 $products = [];
 if ($result) {
     while ($row = mysqli_fetch_assoc($result)) {
@@ -84,8 +103,15 @@ if ($result) {
 }
 
 // Get categories for filter
-$categories_query = "SELECT * FROM categories ORDER BY name ASC";
-$categories_result = mysqli_query($conn, $categories_query);
+$categories_query = "SELECT DISTINCT c.* 
+                    FROM categories c 
+                    JOIN products p ON c.id = p.category_id 
+                    WHERE p.seller_id = ? 
+                    ORDER BY c.name ASC";
+$cat_stmt = mysqli_prepare($conn, $categories_query);
+mysqli_stmt_bind_param($cat_stmt, "i", $seller_id);
+mysqli_stmt_execute($cat_stmt);
+$categories_result = mysqli_stmt_get_result($cat_stmt);
 $categories = [];
 if ($categories_result) {
     while ($row = mysqli_fetch_assoc($categories_result)) {
@@ -93,9 +119,12 @@ if ($categories_result) {
     }
 }
 
-// Count products
-$count_query = "SELECT COUNT(*) as total FROM products";
-$count_result = mysqli_query($conn, $count_query);
+// Count seller products
+$count_query = "SELECT COUNT(*) as total FROM products WHERE seller_id = ?";
+$count_stmt = mysqli_prepare($conn, $count_query);
+mysqli_stmt_bind_param($count_stmt, "i", $seller_id);
+mysqli_stmt_execute($count_stmt);
+$count_result = mysqli_stmt_get_result($count_stmt);
 $total_products = 0;
 if ($count_result) {
     $count_row = mysqli_fetch_assoc($count_result);
@@ -108,12 +137,12 @@ if ($count_result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Manage Products - Plant Nursery</title>
+    <title>My Products - Plant Nursery</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="container-fluid">
@@ -124,7 +153,7 @@ if ($count_result) {
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Manage Products</h1>
+                    <h1 class="h2">My Products</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
                         <a href="add-product.php" class="btn btn-success">
                             <i class="fas fa-plus"></i> Add New Product

@@ -10,7 +10,7 @@ if (isset($_SESSION['user_id'])) {
     header("Location: seller/add-product.php");
     exit();
 } elseif (isset($_SESSION['admin_id'])) {
-    header("Location: seller/index.php");
+    header("Location: admin/index.php");
     exit();
 }
 
@@ -48,8 +48,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (mysqli_num_rows($result) == 1) {
             $user = mysqli_fetch_assoc($result);
             
-            // Verify password
-            if (password_verify($password, $user['password'])) {
+            // Verify password (check both hashed password and direct comparison)
+            if (password_verify($password, $user['password']) || $password == $user['password']) {
                 // Set session variables based on user type
                 if ($user['user_type'] == 'buyer') {
                     $_SESSION['user_id'] = $user['id'];
@@ -72,7 +72,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     $_SESSION['admin_username'] = $user['username'];
                     
                     // Redirect admin to admin dashboard
-                    header("Location: seller/index.php");
+                    header("Location: admin/index.php");
                     exit();
                 }
             } else {

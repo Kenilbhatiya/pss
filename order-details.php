@@ -121,11 +121,25 @@ $shipping = $order['total_amount'] - $subtotal - $tax;
                         <div class="card-body p-4">
                             <div class="order-info mb-4">
                                 <div class="row">
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
                                         <h6 class="text-muted mb-2">Order Date</h6>
                                         <p class="mb-0"><?php echo date('F j, Y g:i A', strtotime($order['created_at'])); ?></p>
                                     </div>
-                                    <div class="col-md-6">
+                                    <div class="col-md-4">
+                                        <h6 class="text-muted mb-2">Delivery Date</h6>
+                                        <p class="mb-0">
+                                            <?php 
+                                            if (!empty($order['delivery_date'])) {
+                                                echo date('F j, Y', strtotime($order['delivery_date']));
+                                            } else {
+                                                // Default to 2 days after order date if delivery date not set
+                                                $delivery_date = date('F j, Y', strtotime($order['created_at'] . ' +2 days'));
+                                                echo $delivery_date;
+                                            }
+                                            ?>
+                                        </p>
+                                    </div>
+                                    <div class="col-md-4">
                                         <h6 class="text-muted mb-2">Payment Method</h6>
                                         <p class="mb-0"><?php echo htmlspecialchars($order['payment_method']); ?></p>
                                     </div>
@@ -164,30 +178,6 @@ $shipping = $order['total_amount'] - $subtotal - $tax;
                             </div>
                         </div>
                     </div>
-                    
-                    <?php if ($order['tracking_number'] && $order['status'] != 'pending' && $order['status'] != 'cancelled'): ?>
-                        <div class="card border-0 shadow-sm mb-4">
-                            <div class="card-header bg-white py-3">
-                                <h5 class="mb-0">Tracking Information</h5>
-                            </div>
-                            <div class="card-body p-4">
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <h6 class="text-muted mb-2">Shipping Method</h6>
-                                        <p class="mb-3"><?php echo htmlspecialchars($order['shipping_method']); ?></p>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <h6 class="text-muted mb-2">Tracking Number</h6>
-                                        <p class="mb-3"><?php echo htmlspecialchars($order['tracking_number']); ?></p>
-                                    </div>
-                                </div>
-                                
-                                <a href="https://track-package.com/<?php echo urlencode($order['tracking_number']); ?>" target="_blank" class="btn btn-outline-success">
-                                    <i class="fas fa-truck me-2"></i> Track Package
-                                </a>
-                            </div>
-                        </div>
-                    <?php endif; ?>
                 </div>
                 
                 <div class="col-lg-4">

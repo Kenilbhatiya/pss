@@ -2,14 +2,17 @@
 // Start session
 session_start();
 
-// Check if user is logged in as admin
-if(!isset($_SESSION['admin_id'])) {
+// Check if user is logged in as seller
+if(!isset($_SESSION['seller_id'])) {
     header("Location: login.php");
     exit();
 }
 
 // Include database connection
 include_once("../includes/db_connection.php");
+
+// Get seller ID from session
+$seller_id = $_SESSION['seller_id'];
 
 // Handle order operations
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -18,24 +21,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'update_status':
                 $order_id = $_POST['order_id'];
                 $status = $_POST['status'];
-                $stmt = $conn->prepare("UPDATE orders SET status = ? WHERE id = ?");
-                $stmt->bind_param("si", $status, $order_id);
-                $stmt->execute();
+                
+                // Verify this order contains products from this seller before updating
+                $check_query = "SELECT COUNT(*) as count FROM orders o 
+                               JOIN order_items oi ON o.id = oi.order_id 
+                               JOIN products p ON oi.product_id = p.id 
+                               WHERE o.id = ? AND p.seller_id = ?";
+                $check_stmt = $conn->prepare($check_query);
+                $check_stmt->bind_param("ii", $order_id, $seller_id);
+                $check_stmt->execute();
+                $check_result = $check_stmt->get_result();
+                $check_row = $check_result->fetch_assoc();
+                
+                // Only update if this is the seller's order
+                if($check_row['count'] > 0) {
+                    $stmt = $conn->prepare("UPDATE orders SET status = ? WHERE id = ?");
+                    $stmt->bind_param("si", $status, $order_id);
+                    $stmt->execute();
+                }
                 break;
         }
     }
 }
 
-// Fetch all orders with user details
-$query = "SELECT o.*, u.name as customer_name, u.email as customer_email 
+// Fetch orders related to this seller's products
+$query = "SELECT DISTINCT o.*, u.username as customer_name, u.email as customer_email 
           FROM orders o 
-          LEFT JOIN users u ON o.user_id = u.id 
+          JOIN users u ON o.user_id = u.id 
+          JOIN order_items oi ON o.id = oi.order_id
+          JOIN products p ON oi.product_id = p.id
+          WHERE p.seller_id = ?
           ORDER BY o.created_at DESC";
-$result = $conn->query($query);
+$stmt = $conn->prepare($query);
+$stmt->bind_param("i", $seller_id);
+$stmt->execute();
+$result = $stmt->get_result();
 $orders = [];
 
-// Check if the query was successful before calling fetch_all()
-if ($result && $result->num_rows > 0) {
+// Check if the query was successful before fetching
+if ($result) {
     $orders = $result->fetch_all(MYSQLI_ASSOC);
 }
 ?>
@@ -50,7 +74,7 @@ if ($result && $result->num_rows > 0) {
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="stylesheet" href="css/admin-style.css">
+    <link rel="stylesheet" href="css/seller-style.css">
 </head>
 <body>
     <div class="container-fluid">
