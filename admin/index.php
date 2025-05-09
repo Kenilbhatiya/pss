@@ -48,8 +48,12 @@ if($products_result && $row = mysqli_fetch_assoc($products_result)) {
 }
 
 // Get recent orders
-$recent_orders_query = "SELECT o.* 
+$recent_orders_query = "SELECT o.*, u.username as customer_name, p.name as product_name 
                        FROM orders o 
+                       LEFT JOIN users u ON o.user_id = u.id
+                       LEFT JOIN order_items oi ON o.id = oi.order_id
+                       LEFT JOIN products p ON oi.product_id = p.id
+                       GROUP BY o.id
                        ORDER BY o.created_at DESC LIMIT 5";
 $recent_orders_result = mysqli_query($conn, $recent_orders_query);
 $recent_orders = [];
@@ -193,7 +197,7 @@ if($recent_sellers_result) {
                                                 <?php foreach($recent_orders as $order): ?>
                                                     <tr>
                                                         <td>#<?php echo $order['id']; ?></td>
-                                                        <td><?php echo htmlspecialchars($order['username'] ?? 'N/A'); ?></td>
+                                                        <td><?php echo htmlspecialchars($order['customer_name'] ?? 'N/A'); ?></td>
                                                         <td><?php echo htmlspecialchars($order['product_name'] ?? 'N/A'); ?></td>
                                                         <td>₹<?php echo number_format($order['total_amount'], 2); ?></td>
                                                         <td>

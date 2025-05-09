@@ -60,6 +60,13 @@ $current_page = basename($_SERVER['PHP_SELF']);
             </li>
             
             <li class="nav-item">
+                <a class="nav-link <?php echo $current_page == 'testimonials.php' ? 'active' : ''; ?>" href="testimonials.php">
+                    <i class="fas fa-quote-right me-2"></i>
+                    Testimonials
+                </a>
+            </li>
+            
+            <li class="nav-item">
                 <a class="nav-link <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>" href="settings.php">
                     <i class="fas fa-cog me-2"></i>
                     Settings

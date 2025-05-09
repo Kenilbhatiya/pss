@@ -211,57 +211,9 @@
                         echo '</div></div></div>';
                     }
                 } else {
-                    // Add default testimonials if none are found
-                    $default_testimonials = [
-                        [
-                            'name' => 'Sarah Johnson',
-                            'comment' => 'I received my Peace Lily in perfect condition. It\'s been thriving in my apartment and has already produced two beautiful flowers!',
-                            'rating' => 5,
-                            'first_letter' => 'S',
-                            'color' => '#28a745'
-                        ],
-                        [
-                            'name' => 'Mike Thompson',
-                            'comment' => 'The customer service was outstanding. When one of my plants arrived damaged, they immediately shipped a replacement.',
-                            'rating' => 5,
-                            'first_letter' => 'M',
-                            'color' => '#007bff'
-                        ],
-                        [
-                            'name' => 'Jennifer Davis',
-                            'comment' => 'I\'ve ordered plants from many online shops, but Plant Nursery has the best quality by far. My Monstera is growing so fast!',
-                            'rating' => 4,
-                            'first_letter' => 'J',
-                            'color' => '#6f42c1'
-                        ]
-                    ];
-                    
-                    foreach ($default_testimonials as $testimonial) {
-                        echo '<div class="col-md-4 mb-4">';
-                        echo '<div class="card h-100">';
-                        echo '<div class="card-body">';
-                        echo '<div class="d-flex align-items-center mb-3">';
-                        
-                        // Display default avatar
-                        echo '<div class="rounded-circle me-3 d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; background-color: ' . $testimonial['color'] . '; color: white; font-weight: bold; font-size: 24px;">';
-                        echo $testimonial['first_letter'];
-                        echo '</div>';
-                        
-                        echo '<div>';
-                        echo '<h5 class="mb-0">' . htmlspecialchars($testimonial['name']) . '</h5>';
-                        echo '</div></div>';
-                        echo '<p class="card-text">"' . htmlspecialchars($testimonial['comment']) . '"</p>';
-                        echo '<div class="text-warning">';
-                        for ($i = 1; $i <= 5; $i++) {
-                            if ($i <= $testimonial['rating']) {
-                                echo '<i class="fas fa-star"></i>';
-                            } else {
-                                echo '<i class="far fa-star"></i>';
-                            }
-                        }
-                        echo '</div>';
-                        echo '</div></div></div>';
-                    }
+                    echo '<div class="col-12 text-center">';
+                    echo '<p>No testimonials yet. Be the first one to share your experience!</p>';
+                    echo '</div>';
                 }
                 ?>
             </div>

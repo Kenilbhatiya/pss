@@ -57,15 +57,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['update_order'])) {
     $status = mysqli_real_escape_string($conn, $_POST['status']);
     $tracking_number = mysqli_real_escape_string($conn, $_POST['tracking_number']);
     $shipping_method = mysqli_real_escape_string($conn, $_POST['shipping_method']);
+    $delivery_date = mysqli_real_escape_string($conn, $_POST['delivery_date']);
     
     // Update order
     $update_query = "UPDATE orders SET 
                     status = ?, 
                     tracking_number = ?, 
-                    shipping_method = ? 
+                    shipping_method = ?,
+                    delivery_date = ? 
                     WHERE id = ?";
     $update_stmt = mysqli_prepare($conn, $update_query);
-    mysqli_stmt_bind_param($update_stmt, "sssi", $status, $tracking_number, $shipping_method, $order_id);
+    mysqli_stmt_bind_param($update_stmt, "ssssi", $status, $tracking_number, $shipping_method, $delivery_date, $order_id);
     
     if (mysqli_stmt_execute($update_stmt)) {
         $success_message = "Order updated successfully!";
@@ -166,6 +168,13 @@ $shipping_carriers = [
                                         </select>
                                     </div>
                                     
+                                    <div class="mb-3">
+                                        <label for="delivery_date" class="form-label">Delivery Date</label>
+                                        <input type="date" class="form-control" id="delivery_date" name="delivery_date" 
+                                            value="<?php echo date('Y-m-d', strtotime($order['delivery_date'])); ?>">
+                                        <small class="form-text text-muted">The expected delivery date to show to the customer</small>
+                                    </div>
+                                    
                                     <div class="mb-3 shipping-fields" <?php echo ($order['status'] != 'shipped' && $order['status'] != 'delivered') ? 'style="display:none;"' : ''; ?>>
                                         <label for="shipping_method" class="form-label">Shipping Method</label>
                                         <select class="form-select" id="shipping_method" name="shipping_method">
@@ -204,7 +213,17 @@ $shipping_carriers = [
                                     <h6 class="text-muted mb-2">Customer Information</h6>
                                     <p><strong>Customer:</strong> <?php echo htmlspecialchars($order['username'] ?? 'N/A'); ?></p>
                                     <p><strong>Order Date:</strong> <?php echo date('F j, Y g:i A', strtotime($order['created_at'])); ?></p>
-                                    <p><strong>Expected Delivery:</strong> <?php echo date('F j, Y', strtotime($order['delivery_date'])); ?></p>
+                                    <p><strong>Expected Delivery:</strong> 
+                                        <?php 
+                                        if (!empty($order['delivery_date'])) {
+                                            echo date('F j, Y', strtotime($order['delivery_date']));
+                                        } else {
+                                            // If delivery date is not set, show estimated date
+                                            echo date('F j, Y', strtotime($order['created_at'] . ' + 3 days'));
+                                            echo ' <small class="text-muted">(Estimated)</small>';
+                                        }
+                                        ?>
+                                    </p>
                                     <p><strong>Payment Method:</strong> <?php echo htmlspecialchars($order['payment_method']); ?></p>
                                 </div>
                                 

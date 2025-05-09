@@ -17,35 +17,32 @@ $page = isset($_GET['page']) && is_numeric($_GET['page']) ? $_GET['page'] : 1;
 $offset = ($page - 1) * $records_per_page;
 
 // Get filter parameters
-$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $search = isset($_GET['search']) ? $_GET['search'] : '';
+$status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 
 // Build query conditions
-$conditions = [];
+$conditions = ["user_type = 'seller'"];
 $params = [];
 $param_types = "";
 
 if(!empty($status_filter)) {
-    $conditions[] = "o.status = ?";
+    $conditions[] = "status = ?";
     $params[] = $status_filter;
-    $param_types .= "s";
+    $param_types .= "i";
 }
 
 if(!empty($search)) {
     $search_term = '%' . $search . '%';
-    $conditions[] = "(o.id LIKE ? OR u.username LIKE ? OR o.username LIKE ? OR p.name LIKE ? OR o.product_name LIKE ?)";
+    $conditions[] = "(username LIKE ? OR email LIKE ?)";
     $params[] = $search_term;
     $params[] = $search_term;
-    $params[] = $search_term;
-    $params[] = $search_term;
-    $params[] = $search_term;
-    $param_types .= "sssss";
+    $param_types .= "ss";
 }
 
 $where_clause = !empty($conditions) ? 'WHERE ' . implode(' AND ', $conditions) : '';
 
 // Get total records count for pagination
-$count_query = "SELECT COUNT(*) as total FROM orders o $where_clause";
+$count_query = "SELECT COUNT(*) as total FROM users $where_clause";
 $stmt = mysqli_prepare($conn, $count_query);
 
 if(!empty($params)) {
@@ -58,21 +55,16 @@ $row = mysqli_fetch_assoc($result);
 $total_records = $row['total'];
 $total_pages = ceil($total_records / $records_per_page);
 
-// Get orders with pagination
-$orders_query = "SELECT o.*, 
-                COALESCE(u.username, o.username) as customer_name, 
-                COALESCE(p.name, o.product_name) as product_name, 
-                COUNT(oi.id) as item_count 
-                FROM orders o 
-                LEFT JOIN users u ON o.user_id = u.id
-                LEFT JOIN order_items oi ON o.id = oi.order_id 
-                LEFT JOIN products p ON oi.product_id = p.id
-                $where_clause 
-                GROUP BY o.id 
-                ORDER BY o.created_at DESC 
-                LIMIT ?, ?";
+// Get sellers with pagination
+$sellers_query = "SELECT u.*, COUNT(p.id) as product_count 
+                 FROM users u 
+                 LEFT JOIN products p ON u.id = p.seller_id 
+                 $where_clause 
+                 GROUP BY u.id 
+                 ORDER BY u.created_at DESC 
+                 LIMIT ?, ?";
 
-$stmt = mysqli_prepare($conn, $orders_query);
+$stmt = mysqli_prepare($conn, $sellers_query);
 $param_types .= "ii";
 $params[] = $offset;
 $params[] = $records_per_page;
@@ -81,10 +73,10 @@ mysqli_stmt_bind_param($stmt, $param_types, ...$params);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 
-$orders = [];
+$sellers = [];
 if($result) {
     while($row = mysqli_fetch_assoc($result)) {
-        $orders[] = $row;
+        $sellers[] = $row;
     }
 }
 ?>
@@ -94,7 +86,7 @@ if($result) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Orders - Admin Dashboard</title>
+    <title>Sellers - Admin Dashboard</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome -->
@@ -110,18 +102,15 @@ if($result) {
             <!-- Main Content -->
             <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4 py-4">
                 <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-                    <h1 class="h2">Orders Management</h1>
+                    <h1 class="h2">Sellers Management</h1>
                     <div class="btn-toolbar mb-2 mb-md-0">
-                        <a href="update_orders_fields.php" class="btn btn-sm btn-outline-primary me-2">
-                            <i class="fas fa-sync-alt"></i> Update Order Fields
-                        </a>
-                        <a href="../index.php" class="btn btn-sm btn-outline-secondary" target="_blank">
+                        <a href="../index.php" class="btn btn-sm btn-outline-primary" target="_blank">
                             <i class="fas fa-eye"></i> View Website
                         </a>
                     </div>
                 </div>
 
-                <!-- Orders Filter and Search -->
+                <!-- Sellers Filter and Search -->
                 <div class="card border-0 shadow-sm mb-4">
                     <div class="card-body">
                         <form method="GET" action="" class="row g-3">
@@ -129,84 +118,60 @@ if($result) {
                                 <label for="status" class="form-label">Filter by Status</label>
                                 <select class="form-select" id="status" name="status">
                                     <option value="">All Statuses</option>
-                                    <option value="pending" <?php echo $status_filter == 'pending' ? 'selected' : ''; ?>>Pending</option>
-                                    <option value="processing" <?php echo $status_filter == 'processing' ? 'selected' : ''; ?>>Processing</option>
-                                    <option value="shipped" <?php echo $status_filter == 'shipped' ? 'selected' : ''; ?>>Shipped</option>
-                                    <option value="delivered" <?php echo $status_filter == 'delivered' ? 'selected' : ''; ?>>Delivered</option>
-                                    <option value="cancelled" <?php echo $status_filter == 'cancelled' ? 'selected' : ''; ?>>Cancelled</option>
+                                    <option value="1" <?php echo $status_filter == '1' ? 'selected' : ''; ?>>Active</option>
+                                    <option value="0" <?php echo $status_filter == '0' ? 'selected' : ''; ?>>Inactive</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
                                 <label for="search" class="form-label">Search</label>
                                 <div class="input-group">
-                                    <input type="text" class="form-control" id="search" name="search" placeholder="Search by Order ID, Username, or Product" value="<?php echo htmlspecialchars($search); ?>">
+                                    <input type="text" class="form-control" id="search" name="search" placeholder="Search by Username or Email" value="<?php echo htmlspecialchars($search); ?>">
                                     <button class="btn btn-outline-secondary" type="submit"><i class="fas fa-search"></i></button>
                                 </div>
                             </div>
                             <div class="col-md-2 d-flex align-items-end">
-                                <a href="orders.php" class="btn btn-outline-secondary w-100">Reset</a>
+                                <a href="sellers.php" class="btn btn-outline-secondary w-100">Reset</a>
                             </div>
                         </form>
                     </div>
                 </div>
 
-                <!-- Orders List -->
+                <!-- Sellers List -->
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
-                                        <th>Order ID</th>
-                                        <th>Customer</th>
-                                        <th>Product</th>
-                                        <th>Date</th>
-                                        <th>Delivery Date</th>
-                                        <th>Total</th>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Products</th>
                                         <th>Status</th>
+                                        <th>Registered</th>
                                         <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <?php if(count($orders) > 0): ?>
-                                        <?php foreach($orders as $order): ?>
+                                    <?php if(count($sellers) > 0): ?>
+                                        <?php foreach($sellers as $seller): ?>
                                             <tr>
-                                                <td>#<?php echo $order['id']; ?></td>
-                                                <td><?php echo htmlspecialchars($order['customer_name'] ?? ''); ?></td>
-                                                <td><?php echo htmlspecialchars($order['product_name'] ?? ''); ?></td>
-                                                <td><?php echo date('M d, Y', strtotime($order['created_at'])); ?></td>
+                                                <td>#<?php echo $seller['id']; ?></td>
+                                                <td><?php echo htmlspecialchars($seller['username']); ?></td>
+                                                <td><?php echo htmlspecialchars($seller['email']); ?></td>
+                                                <td><?php echo $seller['product_count']; ?></td>
                                                 <td>
-                                                    <?php 
-                                                    if (!empty($order['delivery_date'])) {
-                                                        echo date('M d, Y', strtotime($order['delivery_date']));
-                                                    } else {
-                                                        // If delivery date is not set, show estimated date (3-5 days from order date)
-                                                        $estimated_date = date('M d, Y', strtotime($order['created_at'] . ' + 3 days'));
-                                                        echo $estimated_date . ' <small class="text-muted">(Est.)</small>';
-                                                    }
-                                                    ?>
-                                                </td>
-                                                <td>₹<?php echo number_format($order['total_amount'], 2); ?></td>
-                                                <td>
-                                                    <span class="badge bg-<?php 
-                                                        switch($order['status']) {
-                                                            case 'pending': echo 'warning'; break;
-                                                            case 'processing': echo 'info'; break;
-                                                            case 'shipped': echo 'primary'; break;
-                                                            case 'delivered': echo 'success'; break;
-                                                            case 'cancelled': echo 'danger'; break;
-                                                            default: echo 'secondary';
-                                                        }
-                                                    ?>">
-                                                        <?php echo ucfirst($order['status']); ?>
+                                                    <span class="badge bg-<?php echo $seller['status'] ? 'success' : 'danger'; ?>">
+                                                        <?php echo $seller['status'] ? 'Active' : 'Inactive'; ?>
                                                     </span>
                                                 </td>
+                                                <td><?php echo date('M d, Y', strtotime($seller['created_at'])); ?></td>
                                                 <td>
                                                     <div class="btn-group">
-                                                        <a href="order-details.php?id=<?php echo $order['id']; ?>" class="btn btn-sm btn-outline-primary">
+                                                        <a href="seller-details.php?id=<?php echo $seller['id']; ?>" class="btn btn-sm btn-outline-primary">
                                                             <i class="fas fa-eye"></i>
                                                         </a>
-                                                        <a href="update-order.php?id=<?php echo $order['id']; ?>" class="btn btn-sm btn-outline-secondary">
+                                                        <a href="edit-seller.php?id=<?php echo $seller['id']; ?>" class="btn btn-sm btn-outline-secondary">
                                                             <i class="fas fa-edit"></i>
                                                         </a>
                                                     </div>
@@ -215,7 +180,7 @@ if($result) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="8" class="text-center">No orders found</td>
+                                            <td colspan="7" class="text-center">No sellers found</td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>

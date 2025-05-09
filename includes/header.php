@@ -37,18 +37,6 @@ $is_seller = isset($_SESSION['user_type']) && $_SESSION['user_type'] == 'seller'
                 <li class="nav-item">
                     <a class="nav-link" href="index.php">Home</a>
                 </li>
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" id="categoriesDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                        Categories
-                    </a>
-                    <ul class="dropdown-menu" aria-labelledby="categoriesDropdown">
-                        <?php foreach($categories as $category): ?>
-                            <li><a class="dropdown-item" href="category.php?id=<?php echo $category['id']; ?>"><?php echo htmlspecialchars($category['name']); ?></a></li>
-                        <?php endforeach; ?>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="shop.php">All Categories</a></li>
-                    </ul>
-                </li>
                 <li class="nav-item">
                     <a class="nav-link" href="shop.php">Shop</a>
                 </li>

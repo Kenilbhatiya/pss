@@ -332,6 +332,9 @@ if (mysqli_num_rows($addresses_table_result) > 0) {
                                 <a class="list-group-item list-group-item-action" id="change-password-tab" data-bs-toggle="list" href="#change-password" role="tab" aria-controls="change-password" aria-selected="false">
                                     <i class="fas fa-lock me-2"></i> Change Password
                                 </a>
+                                <a class="list-group-item list-group-item-action" id="feedback-tab" data-bs-toggle="list" href="#feedback" role="tab" aria-controls="feedback" aria-selected="false">
+                                    <i class="fas fa-comment me-2"></i> Submit Feedback
+                                </a>
                             </div>
                             
                             <div class="mt-4">
@@ -687,6 +690,100 @@ if (mysqli_num_rows($addresses_table_result) > 0) {
                                         <button type="submit" name="change_password" class="btn btn-success">Change Password</button>
                                     </form>
                                 </div>
+                                
+                                <!-- Feedback Tab -->
+                                <div class="tab-pane fade" id="feedback" role="tabpanel" aria-labelledby="feedback-tab">
+                                    <h3 class="mb-4">Share Your Experience</h3>
+                                    
+                                    <?php
+                                    // Check if user has already submitted testimonial
+                                    $existing_testimonial = null;
+                                    $testimonial_query = "SELECT * FROM testimonials WHERE name = ? ORDER BY created_at DESC LIMIT 1";
+                                    $testimonial_stmt = mysqli_prepare($conn, $testimonial_query);
+                                    if ($testimonial_stmt) {
+                                        $user_fullname = $user['first_name'] . ' ' . $user['last_name'];
+                                        mysqli_stmt_bind_param($testimonial_stmt, "s", $user_fullname);
+                                        mysqli_stmt_execute($testimonial_stmt);
+                                        $testimonial_result = mysqli_stmt_get_result($testimonial_stmt);
+                                        
+                                        if ($testimonial_result && mysqli_num_rows($testimonial_result) > 0) {
+                                            $existing_testimonial = mysqli_fetch_assoc($testimonial_result);
+                                        }
+                                    }
+                                    ?>
+                                    
+                                    <?php if ($existing_testimonial): ?>
+                                        <div class="alert alert-info mb-4">
+                                            <p><strong>Thank you for your previous feedback!</strong></p>
+                                            <p>You submitted the following testimonial on <?php echo date('F j, Y', strtotime($existing_testimonial['created_at'])); ?>:</p>
+                                            <div class="card mt-3">
+                                                <div class="card-body">
+                                                    <div class="d-flex align-items-center mb-3">
+                                                        <?php if (!empty($existing_testimonial['image_path'])): ?>
+                                                            <img src="<?php echo $existing_testimonial['image_path']; ?>" alt="<?php echo htmlspecialchars($existing_testimonial['name']); ?>" class="rounded-circle me-3" style="width: 50px; height: 50px; object-fit: cover;">
+                                                        <?php else: ?>
+                                                            <div class="rounded-circle me-3 d-flex align-items-center justify-content-center bg-success text-white" style="width: 50px; height: 50px; font-weight: bold;">
+                                                                <?php echo strtoupper(substr($existing_testimonial['name'], 0, 1)); ?>
+                                                            </div>
+                                                        <?php endif; ?>
+                                                        <h5 class="mb-0"><?php echo htmlspecialchars($existing_testimonial['name']); ?></h5>
+                                                    </div>
+                                                    <p>"<?php echo htmlspecialchars($existing_testimonial['comment']); ?>"</p>
+                                                    <div class="text-warning">
+                                                        <?php for ($i = 1; $i <= 5; $i++): ?>
+                                                            <?php if ($i <= $existing_testimonial['rating']): ?>
+                                                                <i class="fas fa-star"></i>
+                                                            <?php else: ?>
+                                                                <i class="far fa-star"></i>
+                                                            <?php endif; ?>
+                                                        <?php endfor; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <?php if (isset($_SESSION['error_message'])): ?>
+                                        <div class="alert alert-danger mb-4">
+                                            <?php echo $_SESSION['error_message']; unset($_SESSION['error_message']); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                    
+                                    <form action="submit_feedback.php" method="POST" enctype="multipart/form-data">
+                                        <div class="mb-3">
+                                            <label for="feedback_comment" class="form-label">Your Experience with Our Plants</label>
+                                            <textarea class="form-control" id="feedback_comment" name="comment" rows="4" placeholder="Share your experience with our plants and services..." required></textarea>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Rating</label>
+                                            <div class="star-rating">
+                                                <div class="star-rating-input">
+                                                    <?php for ($i = 5; $i >= 1; $i--): ?>
+                                                        <input type="radio" id="star<?php echo $i; ?>" name="rating" value="<?php echo $i; ?>" <?php echo $i == 5 ? 'checked' : ''; ?> />
+                                                        <label for="star<?php echo $i; ?>"><i class="fas fa-star"></i></label>
+                                                    <?php endfor; ?>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="feedback_image" class="form-label">Upload Image (Optional)</label>
+                                            <input type="file" class="form-control" id="feedback_image" name="image" accept="image/*">
+                                            <div class="form-text">Share a photo of your plants or garden.</div>
+                                        </div>
+                                        
+                                        <div class="mb-3 form-check">
+                                            <input type="checkbox" class="form-check-input" id="display_name" name="display_name" value="1" checked>
+                                            <label class="form-check-label" for="display_name">Display my name with this testimonial</label>
+                                        </div>
+                                        
+                                        <input type="hidden" name="name" value="<?php echo htmlspecialchars($user['first_name'] . ' ' . $user['last_name']); ?>">
+                                        <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
+                                        
+                                        <button type="submit" class="btn btn-success">Submit Feedback</button>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -901,6 +998,36 @@ if (mysqli_num_rows($addresses_table_result) > 0) {
             align-items: center;
             justify-content: center;
             font-size: 20px;
+        }
+        
+        /* Star Rating Styles */
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            margin-bottom: 15px;
+        }
+        
+        .star-rating-input {
+            display: inline-flex;
+            flex-direction: row-reverse;
+        }
+        
+        .star-rating-input input {
+            display: none;
+        }
+        
+        .star-rating-input label {
+            cursor: pointer;
+            font-size: 1.5rem;
+            color: #ddd;
+            margin: 0 2px;
+            transition: color 0.2s ease;
+        }
+        
+        .star-rating-input label:hover,
+        .star-rating-input label:hover ~ label,
+        .star-rating-input input:checked ~ label {
+            color: #ffc107;
         }
     </style>
 </body>

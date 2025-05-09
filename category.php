@@ -54,6 +54,24 @@ if ($result) {
         $products[] = $row;
     }
 }
+
+// Set default image if none is provided
+$categoryImage = "images/default-category.jpg"; // Default image
+if (isset($category['image_path']) && !empty($category['image_path'])) {
+    // Check if the file exists
+    $imagePath = $category['image_path'];
+    if (file_exists($imagePath)) {
+        $categoryImage = $imagePath;
+    } else {
+        // If the category is Succulents (ID 3), use the succulents.jpg image
+        if ($category_id == 3) {
+            $categoryImage = "images/succulents.jpg";
+            // Update the database with the correct path
+            $updateImageQuery = "UPDATE categories SET image_path = '$categoryImage' WHERE id = $category_id";
+            mysqli_query($conn, $updateImageQuery);
+        }
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -84,10 +102,10 @@ if ($result) {
                         </ol>
                     </nav>
                     <h1 class="display-4 fw-bold text-success"><?php echo htmlspecialchars($category['name']); ?></h1>
-                    <p class="lead"><?php echo htmlspecialchars($category['description']); ?></p>
+                    <p class="lead"><?php echo isset($category['description']) ? htmlspecialchars($category['description']) : ''; ?></p>
                 </div>
                 <div class="col-md-6">
-                    <img src="<?php echo $category['image_path']; ?>" alt="<?php echo htmlspecialchars($category['name']); ?>" class="img-fluid rounded shadow">
+                    <img src="<?php echo $categoryImage; ?>" alt="<?php echo htmlspecialchars($category['name']); ?>" class="img-fluid rounded shadow">
                 </div>
             </div>
         </div>
@@ -122,7 +140,7 @@ if ($result) {
                     <?php foreach($products as $product): ?>
                         <div class="col-md-4 col-lg-3 mb-4">
                             <div class="card h-100 product-card">
-                                <img src="<?php echo $product['image_path']; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($product['name']); ?>">
+                                <img src="<?php echo isset($product['image_path']) ? $product['image_path'] : 'images/default-product.jpg'; ?>" class="card-img-top" alt="<?php echo htmlspecialchars($product['name']); ?>" onerror="this.src='images/default-product.jpg'">
                                 <div class="card-body">
                                     <h5 class="card-title"><?php echo htmlspecialchars($product['name']); ?></h5>
                                     <p class="card-text text-success fw-bold">₹<?php echo number_format($product['price'], 2); ?></p>
